@@ -44,3 +44,6 @@
 	url = https://github.com/llvm/llvm-project.git
 	active = false
 	update = none
+[submodule "toolchain/etiss_base/etiss"]
+	path = toolchain/etiss_base/etiss
+	url = git@github.com:danielschloms/etiss.git
