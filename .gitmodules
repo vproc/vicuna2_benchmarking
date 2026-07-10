@@ -53,3 +53,6 @@
 [submodule "toolchain/etiss_base/etiss_arch_riscv"]
 	path = toolchain/etiss_base/etiss_arch_riscv
 	url = git@github.com:danielschloms/etiss_arch_riscv.git
+[submodule "toolchain/etiss_base/etiss_rvv"]
+	path = toolchain/etiss_base/etiss_rvv
+	url = git@github.com:danielschloms/etiss.git
