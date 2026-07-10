@@ -17,8 +17,8 @@ SEARCH_DIR(.)
 
 MEMORY
 {
-  ROM  (rx) : ORIGIN = 0x00000000, LENGTH = 0x00400000
-  RAM  (rw) : ORIGIN = 0x00400000, LENGTH = 0x00100000
+  ROM  (rx) : ORIGIN = 0x00100000, LENGTH = 0x00400000
+  RAM  (rw) : ORIGIN = 0x00600000, LENGTH = 0x00100000
 }
 
 /* minimum sizes for heap and stack. It will be checked that they can fit on the RAM */
