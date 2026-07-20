@@ -7,7 +7,7 @@ macro(add_IreeBenchmark_Spike TEST_NAME TEST_DIR)
     set(TEST_MLIR_SOURCE ${TEST_DIR}/${TEST_NAME}.mlir)
     set(TEST_VMFB ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.vmfb)
     set(TEST_C_HEADER ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.h)
-    set(TEST_MAIN_SOURCE ${TEST_DIR}/main.c)
+    set(TEST_MAIN_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/../framework/main.cpp)
 
     # Find necessary tools
     find_program(IREE_COMPILE_TOOL iree-compile HINTS ${IREE_COMPILER_BIN_DIR} REQUIRED)
@@ -75,6 +75,8 @@ macro(add_IreeBenchmark_Spike TEST_NAME TEST_DIR)
         ${CMAKE_CURRENT_SOURCE_DIR}/iree/iree-source/runtime/src
         ${CMAKE_CURRENT_SOURCE_DIR}/iree/iree-build-rv32-runtime/runtime/src
         ${CMAKE_CURRENT_SOURCE_DIR}/iree/iree-source/third_party/flatcc/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../framework
+        ${CMAKE_CURRENT_SOURCE_DIR}/../framework/spike
     )
 
     target_compile_definitions(${TEST_TARGET} PRIVATE
@@ -87,6 +89,7 @@ macro(add_IreeBenchmark_Spike TEST_NAME TEST_DIR)
     )
 
     target_compile_options(${TEST_TARGET} PRIVATE -fno-builtin)
+    target_compile_features(${TEST_TARGET} PRIVATE cxx_std_14)
 
     target_sources(${TEST_TARGET} PUBLIC
         ${TEST_MAIN_SOURCE}

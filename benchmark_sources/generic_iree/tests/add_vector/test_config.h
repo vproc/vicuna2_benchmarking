@@ -18,6 +18,9 @@
 // Output configuration
 #define TEST_OUTPUT_SIZE 4
 
+// Memory pool size for IREE runtime
+#define STATIC_POOL_SIZE (1024 * 1024)  // 1 MB static arena
+
 // Test input data
 static const int8_t g_test_input_0[4] = {5, 3, 9, 7};
 static const int8_t g_test_input_1[4] = {1, 2, 3, 4};
@@ -35,8 +38,8 @@ static const int8_t g_test_expected[4] = {6, 5, 12, 11};
             1, shape, IREE_HAL_ELEMENT_TYPE_SINT_8,                 \
             IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,                 \
             (iree_hal_buffer_params_t){                              \
-                .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,          \
-                .usage = IREE_HAL_BUFFER_USAGE_DEFAULT},            \
+                .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,             \
+                .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL},         \
             iree_make_const_byte_span(g_test_input_0, 4), &arg0))) {\
       _setup_ok = 0;                                                 \
     } else {                                                          \
@@ -52,8 +55,8 @@ static const int8_t g_test_expected[4] = {6, 5, 12, 11};
                 IREE_HAL_ELEMENT_TYPE_SINT_8,                       \
                 IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,             \
                 (iree_hal_buffer_params_t){                          \
-                    .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,      \
-                    .usage = IREE_HAL_BUFFER_USAGE_DEFAULT},        \
+                    .usage = IREE_HAL_BUFFER_USAGE_DEFAULT,         \
+                    .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL},     \
                 iree_make_const_byte_span(g_test_input_1, 4),       \
                 &arg1))) {                                            \
       _setup_ok = 0;                                                 \

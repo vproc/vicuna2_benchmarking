@@ -39,12 +39,7 @@ void* sbrk(ptrdiff_t incr) {
   return _sbrk(incr);
 }
 
-// HTIF (Host-Target Interface) tohost register for Spike simulator
-extern volatile uint64_t tohost;
-
 void _exit(int status) {
-  uint64_t exit_code = ((uint64_t)status << 1) | 1;
-  tohost = exit_code;
   while (1) { __asm__ volatile ("wfi"); }
 }
 
@@ -53,9 +48,6 @@ void _exit_r(struct _reent* r, int status) {
 }
 
 int _write(int file, const char* ptr, int len) {
-  for (int i = 0; i < len; i++) {
-    tohost = (0x01ULL << 56) | (uint64_t)(unsigned char)ptr[i];
-  }
   return len;
 }
 
