@@ -1,0 +1,227 @@
+From b4d002558bbf78b37589ed594fb2a14807194d80 Mon Sep 17 00:00:00 2001
+From: Han-Kuan Chen <hankuan.chen@sifive.com>
+Date: Wed, 8 Apr 2026 03:17:27 -0700
+Subject: [PATCH 2/5] Fix generic RISC-V build: disable async sockets/signals
+ on IREE_PLATFORM_GENERIC
+
+Commit 7802eb5dad309333118a9d552c5f2f98ac302de7 added async socket and
+signal support assuming a host platform with POSIX (or Windows)
+facilities available. The generic RISC-V toolchain used by
+build_tools/cmake/generic_riscv64.cmake defines IREE_PLATFORM_GENERIC
+and targets a bare-metal environment without <sys/socket.h>, <signal.h>,
+or real OS signals. This caused the generic RISC-V runtime build to
+fail.
+
+Fix this by making async sockets and signals explicitly unsupported on
+IREE_PLATFORM_GENERIC:
+- Provide stub implementations of iree_async_socket_* on
+IREE_PLATFORM_GENERIC that always return IREE_STATUS_UNIMPLEMENTED and
+avoid including POSIX socket headers.
+- Restrict inclusion of <signal.h> and sigset_t-based helpers to
+non-generic platforms, and make the generic bare-metal signal helpers
+no-ops.
+Bare-metal targets are not expected to expose a POSIX socket API, so
+this matches the existing pattern used for file I/O and time on
+IREE_PLATFORM_GENERIC. Behavior on existing host platforms
+(Linux/Android/Windows/BSD/Emscripten) is unchanged.
+
+Signed-off-by: Han-Kuan Chen <hankuan.chen@sifive.com>
+---
+ runtime/src/iree/async/socket.c      | 114 +++++++++++++++++++--------
+ runtime/src/iree/async/util/signal.c |  10 ++-
+ runtime/src/iree/async/util/signal.h |   4 +-
+ 3 files changed, 89 insertions(+), 39 deletions(-)
+
+diff --git a/runtime/src/iree/async/socket.c b/runtime/src/iree/async/socket.c
+index 62ce739f2f..331402ecab 100644
+--- a/runtime/src/iree/async/socket.c
++++ b/runtime/src/iree/async/socket.c
+@@ -8,6 +8,86 @@
+ 
+ #include "iree/async/proactor.h"
+ 
++//===----------------------------------------------------------------------===//
++// Platforms without socket support (generic bare-metal).
++//===----------------------------------------------------------------------===//
++
++#if defined(IREE_PLATFORM_GENERIC) || !defined(IREE_SOCKETS_ENABLE)
++
++IREE_API_EXPORT iree_status_t iree_async_socket_create(
++    iree_async_proactor_t* proactor, iree_async_socket_type_t type,
++    iree_async_socket_options_t options, iree_async_socket_t** out_socket) {
++  (void)proactor;
++  (void)type;
++  (void)options;
++  (void)out_socket;
++  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
++                          "sockets not supported on this platform");
++}
++
++IREE_API_EXPORT iree_status_t iree_async_socket_import(
++    iree_async_proactor_t* proactor, iree_async_primitive_t primitive,
++    iree_async_socket_type_t type, iree_async_socket_flags_t flags,
++    iree_async_socket_t** out_socket) {
++  (void)proactor;
++  (void)primitive;
++  (void)type;
++  (void)flags;
++  (void)out_socket;
++  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
++                          "sockets not supported on this platform");
++}
++
++IREE_API_EXPORT void iree_async_socket_retain(iree_async_socket_t* socket) {
++  (void)socket;
++}
++
++IREE_API_EXPORT void iree_async_socket_release(iree_async_socket_t* socket) {
++  (void)socket;
++}
++
++IREE_API_EXPORT iree_status_t iree_async_socket_bind(
++    iree_async_socket_t* socket, const iree_async_address_t* address) {
++  (void)socket;
++  (void)address;
++  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
++                          "sockets not supported on this platform");
++}
++
++IREE_API_EXPORT iree_status_t iree_async_socket_listen(
++    iree_async_socket_t* socket, iree_host_size_t backlog) {
++  (void)socket;
++  (void)backlog;
++  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
++                          "sockets not supported on this platform");
++}
++
++IREE_API_EXPORT iree_status_t iree_async_socket_query_local_address(
++    const iree_async_socket_t* socket, iree_async_address_t* out_address) {
++  (void)socket;
++  (void)out_address;
++  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
++                          "sockets not supported on this platform");
++}
++
++IREE_API_EXPORT iree_status_t iree_async_socket_shutdown(
++    iree_async_socket_t* socket, iree_async_socket_shutdown_mode_t mode) {
++  (void)socket;
++  (void)mode;
++  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
++                          "sockets not supported on this platform");
++}
++
++IREE_API_EXPORT iree_status_t iree_async_socket_query_send_space(
++    iree_async_socket_t* socket, iree_host_size_t* out_space) {
++  (void)socket;
++  (void)out_space;
++  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
++                          "sockets not supported on this platform");
++}
++
++#endif  // !IREE_PLATFORM_GENERIC
++
+ //===----------------------------------------------------------------------===//
+ // Platform abstractions
+ //===----------------------------------------------------------------------===//
+@@ -352,36 +432,4 @@ IREE_API_EXPORT iree_status_t iree_async_socket_query_send_space(
+   return iree_ok_status();
+ }
+ 
+-#else  // !IREE_SOCKETS_ENABLE
+-
+-IREE_API_EXPORT iree_status_t iree_async_socket_bind(
+-    iree_async_socket_t* socket, const iree_async_address_t* address) {
+-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+-                          "sockets not available on this platform");
+-}
+-
+-IREE_API_EXPORT iree_status_t iree_async_socket_listen(
+-    iree_async_socket_t* socket, iree_host_size_t backlog) {
+-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+-                          "sockets not available on this platform");
+-}
+-
+-IREE_API_EXPORT iree_status_t iree_async_socket_query_local_address(
+-    const iree_async_socket_t* socket, iree_async_address_t* out_address) {
+-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+-                          "sockets not available on this platform");
+-}
+-
+-IREE_API_EXPORT iree_status_t iree_async_socket_shutdown(
+-    iree_async_socket_t* socket, iree_async_socket_shutdown_mode_t mode) {
+-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+-                          "sockets not available on this platform");
+-}
+-
+-IREE_API_EXPORT iree_status_t iree_async_socket_query_send_space(
+-    iree_async_socket_t* socket, iree_host_size_t* out_space) {
+-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+-                          "sockets not available on this platform");
+-}
+-
+-#endif  // IREE_SOCKETS_ENABLE
++#endif  // !IREE_PLATFORM_GENERIC
+diff --git a/runtime/src/iree/async/util/signal.c b/runtime/src/iree/async/util/signal.c
+index 8c7b6719be..08ac4593d9 100644
+--- a/runtime/src/iree/async/util/signal.c
++++ b/runtime/src/iree/async/util/signal.c
+@@ -8,7 +8,7 @@
+ 
+ #include "iree/base/internal/atomics.h"
+ 
+-#if !defined(IREE_PLATFORM_WINDOWS)
++#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_GENERIC)
+ #include <signal.h>
+ #endif
+ 
+@@ -58,7 +58,7 @@ IREE_API_EXPORT iree_status_t iree_async_signal_ignore_broken_pipe(void) {
+   return iree_ok_status();
+ }
+ 
+-#elif defined(IREE_PLATFORM_WASM)
++#elif defined(IREE_PLATFORM_EMSCRIPTEN) || defined(IREE_PLATFORM_GENERIC) || defined(IREE_PLATFORM_WASM)
+ 
+ // Wasm has no POSIX signals.
+ 
+@@ -251,7 +251,8 @@ iree_async_signal_subscription_t* iree_async_signal_subscription_dispatch(
+ // POSIX signal number conversion
+ //===----------------------------------------------------------------------===//
+ 
+-#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_WASM)
++#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_EMSCRIPTEN) && \
++    !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_WASM)
+ 
+ int iree_async_signal_to_posix(iree_async_signal_t signal) {
+   switch (signal) {
+@@ -301,4 +302,5 @@ void iree_async_signal_build_sigset(sigset_t* mask) {
+   sigaddset(mask, SIGUSR2);
+ }
+ 
+-#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_WASM
++#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_EMSCRIPTEN &&
++        // !IREE_PLATFORM_GENERIC && !IREE_PLATFORM_WASM
+diff --git a/runtime/src/iree/async/util/signal.h b/runtime/src/iree/async/util/signal.h
+index 678de57569..547b8bd4e9 100644
+--- a/runtime/src/iree/async/util/signal.h
++++ b/runtime/src/iree/async/util/signal.h
+@@ -124,7 +124,7 @@ void iree_async_signal_subscription_defer_unsubscribe(
+ // POSIX signal number conversion
+ //===----------------------------------------------------------------------===//
+ 
+-#if !defined(IREE_PLATFORM_WINDOWS)
++#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_GENERIC)
+ 
+ // Converts an IREE signal enum to the corresponding POSIX signal number.
+ // Returns 0 for IREE_ASYNC_SIGNAL_NONE or invalid signals.
+@@ -138,7 +138,7 @@ iree_async_signal_t iree_async_signal_from_posix(int signo);
+ // This is used by signalfd and pthread_sigmask.
+ void iree_async_signal_build_sigset(sigset_t* mask);
+ 
+-#endif  // !IREE_PLATFORM_WINDOWS
++#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_GENERIC
+ 
+ #ifdef __cplusplus
+ }  // extern "C"
+-- 
+2.53.0
+

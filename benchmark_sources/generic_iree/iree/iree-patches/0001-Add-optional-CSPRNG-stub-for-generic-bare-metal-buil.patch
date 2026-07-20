@@ -1,0 +1,128 @@
+From dc37f1cbf33cff9569f05b1419c208228e39cf72 Mon Sep 17 00:00:00 2001
+From: Han-Kuan Chen <hankuan.chen@sifive.com>
+Date: Tue, 7 Apr 2026 09:12:38 -0700
+Subject: [PATCH 1/5] Add optional CSPRNG stub for generic/bare-metal builds
+
+For some embedded/bare-metal environments we never need a CSPRNG, but we
+still want the runtime to build. In those cases it is better to compile
+successfully and have CSPRNG calls return an explicit UNIMPLEMENTED
+status than to fail the build at compile time.
+
+This change adds an opt-in CMake option IREE_CSPRNG_USE_STUB (default
+OFF) that enables a stub iree_csprng_fill returning
+IREE_STATUS_UNIMPLEMENTED. The default behavior remains strict: if the
+option is not enabled, unsupported platforms still hit the existing
+
+Signed-off-by: Han-Kuan Chen <hankuan.chen@sifive.com>
+---
+ CMakeLists.txt                                |  5 +++++
+ build_tools/cmake/generic_riscv32.cmake       |  1 +
+ build_tools/cmake/generic_riscv64.cmake       |  1 +
+ runtime/src/iree/base/internal/BUILD.bazel    | 10 ++++++++++
+ runtime/src/iree/base/internal/CMakeLists.txt |  5 +++++
+ runtime/src/iree/base/internal/csprng.c       | 12 ++++++++++++
+ 6 files changed, 34 insertions(+)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d940c82f4a..eccbfacd68 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -49,6 +49,11 @@ option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF
+ option(IREE_ENABLE_RENDERDOC_PROFILING "Enables profiling HAL devices with the RenderDoc tool." OFF)
+ option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
+ option(IREE_SYNCHRONIZATION_DISABLE_UNSAFE "Disables all synchronization primitives (for single-threaded bare-metal targets only)." OFF)
++
++# Allow opting into a stub CSPRNG implementation on generic/bare-metal targets.
++option(IREE_CSPRNG_USE_STUB
++  "Allow building a stub CSPRNG implementation on generic/bare-metal targets (returns IREE_STATUS_UNIMPLEMENTED)."
++  OFF)
+ option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
+ # Enables POSIX API support. When disabled, tools requiring POSIX (e.g., iree-flatcc-cli) will not be built.
+ option(IREE_ENABLE_POSIX "Builds IREE in with POSIX support." ON)
+diff --git a/build_tools/cmake/generic_riscv32.cmake b/build_tools/cmake/generic_riscv32.cmake
+index 8a4363ea12..e6eb5dd563 100644
+--- a/build_tools/cmake/generic_riscv32.cmake
++++ b/build_tools/cmake/generic_riscv32.cmake
+@@ -48,6 +48,7 @@ set(IREE_ENABLE_POSIX OFF CACHE BOOL "" FORCE)
+ set(IREE_ENABLE_THREADING OFF CACHE BOOL "" FORCE)
+ set(IREE_SYNCHRONIZATION_DISABLE_UNSAFE ON CACHE BOOL "" FORCE)
+ set(IREE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
++set(IREE_CSPRNG_USE_STUB ON CACHE BOOL "" FORCE)
+ 
+ # Specify ISA spec for march=rv32imf. This is to resolve the mismatch between
+ # llvm and binutil ISA version.
+diff --git a/build_tools/cmake/generic_riscv64.cmake b/build_tools/cmake/generic_riscv64.cmake
+index 3dce78d567..9c9aabcc61 100644
+--- a/build_tools/cmake/generic_riscv64.cmake
++++ b/build_tools/cmake/generic_riscv64.cmake
+@@ -31,6 +31,7 @@ endif()
+ set(CMAKE_C_EXTENSIONS OFF CACHE BOOL "" FORCE) # runtime/src/iree/base/time.c:108:13: error: call to undeclared function 'clock_nanosleep'
+ set(IREE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+ set(IREE_ENABLE_POSIX OFF CACHE BOOL "" FORCE)
++set(IREE_CSPRNG_USE_STUB ON CACHE BOOL "" FORCE)
+ set(IREE_ENABLE_THREADING OFF CACHE BOOL "" FORCE)
+ set(IREE_SYNCHRONIZATION_DISABLE_UNSAFE ON CACHE BOOL "" FORCE)
+ set(IREE_HAL_DRIVER_LOCAL_TASK OFF CACHE BOOL "" FORCE)
+diff --git a/runtime/src/iree/base/internal/BUILD.bazel b/runtime/src/iree/base/internal/BUILD.bazel
+index 58828a33d9..ba17e90c93 100644
+--- a/runtime/src/iree/base/internal/BUILD.bazel
++++ b/runtime/src/iree/base/internal/BUILD.bazel
+@@ -209,6 +209,16 @@ iree_runtime_cc_library(
+     ],
+ )
+ 
++iree_cmake_extra_content(
++    content = """
++if(IREE_CSPRNG_USE_STUB)
++  # Enable the generic/bare-metal CSPRNG stub implementation on CMake builds.
++  target_compile_definitions(iree_base_internal_csprng PUBLIC IREE_CSPRNG_USE_STUB)
++endif()
++""",
++    inline = True,
++)
++
+ iree_runtime_cc_test(
+     name = "csprng_test",
+     srcs = ["csprng_test.cc"],
+diff --git a/runtime/src/iree/base/internal/CMakeLists.txt b/runtime/src/iree/base/internal/CMakeLists.txt
+index 17db3a4e3b..4a42e86981 100644
+--- a/runtime/src/iree/base/internal/CMakeLists.txt
++++ b/runtime/src/iree/base/internal/CMakeLists.txt
+@@ -220,6 +220,11 @@ iree_cc_library(
+   PUBLIC
+ )
+ 
++if(IREE_CSPRNG_USE_STUB)
++  # Enable the generic/bare-metal CSPRNG stub implementation on CMake builds.
++  target_compile_definitions(iree_base_internal_csprng PUBLIC IREE_CSPRNG_USE_STUB)
++endif()
++
+ iree_cc_test(
+   NAME
+     csprng_test
+diff --git a/runtime/src/iree/base/internal/csprng.c b/runtime/src/iree/base/internal/csprng.c
+index 0377fa791e..f46e2bee70 100644
+--- a/runtime/src/iree/base/internal/csprng.c
++++ b/runtime/src/iree/base/internal/csprng.c
+@@ -92,6 +92,18 @@ IREE_API_EXPORT iree_status_t iree_csprng_fill(iree_byte_span_t buffer) {
+   return iree_ok_status();
+ }
+ 
++#elif defined(IREE_CSPRNG_USE_STUB)
++
++// This is intended for builds where no operating system CSPRNG is available and
++// callers can tolerate IREE_STATUS_UNIMPLEMENTED. On platforms that can provide
++// a real CSPRNG, prefer adding a proper implementation above instead of
++// enabling this stub.
++IREE_API_EXPORT iree_status_t iree_csprng_fill(iree_byte_span_t buffer) {
++  if (buffer.data_length == 0) return iree_ok_status();
++  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
++                          "CSPRNG not implemented for this platform");
++}
++
+ #else
+ 
+ #error "CSPRNG not implemented for this platform"
+-- 
+2.53.0
+

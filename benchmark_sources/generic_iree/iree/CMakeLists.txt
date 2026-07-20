@@ -60,6 +60,32 @@ string(APPEND CMAKE_ASM_FLAGS " -DIREE_TIME_NOW_FN=\\{return\\ 0\\;\\}")
 # Math library
 string(APPEND CMAKE_EXE_LINKER_FLAGS " -lm")
 
+# Apply IREE patches if not already applied
+set(IREE_PATCH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree-patches")
+set(IREE_PATCH_STAMP "${CMAKE_CURRENT_SOURCE_DIR}/iree-source/.patches_applied")
+
+if(NOT EXISTS "${IREE_PATCH_STAMP}")
+    message(STATUS "Applying IREE patches from ${IREE_PATCH_DIR}")
+    file(GLOB IREE_PATCHES "${IREE_PATCH_DIR}/*.patch")
+    
+    # Sort patches to ensure they are applied in order
+    list(SORT IREE_PATCHES)
+    
+    foreach(PATCH_FILE IN LISTS IREE_PATCHES)
+        message(STATUS "Applying patch: ${PATCH_FILE}")
+        execute_process(
+            COMMAND git apply "${PATCH_FILE}"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/iree-source"
+            RESULT_VARIABLE PATCH_RESULT
+        )
+        if(NOT PATCH_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to apply patch: ${PATCH_FILE}")
+        endif()
+    endforeach()
+    
+    file(TOUCH "${IREE_PATCH_STAMP}")
+endif()
+
 # Add IREE runtime source as subdirectory
 set(_MLPERFTINY_IREE_PREV_SYSTEM_PROCESSOR ${CMAKE_SYSTEM_PROCESSOR})
 set(CMAKE_SYSTEM_PROCESSOR riscv32)
