@@ -20,7 +20,6 @@ message(STATUS "Baremetal infrastructure dir: ${GENERIC_IREE_BAREMETAL_DIR}")
 build_spike()
 
 # Set IREE compiler tools directory (where iree-compile lives)
-set(IREE_COMPILER_BIN_DIR "/home/efectn/iree-prod-test/iree-build-compiler/tools")
 
 # Include IREE test macro
 include(CMake/add_test.cmake)

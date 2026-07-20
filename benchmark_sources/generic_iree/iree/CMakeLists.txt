@@ -31,8 +31,9 @@ set(IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS OFF CACHE BOOL "" FORCE)
 set(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF ON CACHE BOOL "" FORCE)
 
 # Fetch compiler from host
-# TODO: add an optin for compile the compiler as well as runtime
-set(IREE_HOST_BIN_DIR "/home/efectn/iree-prod-test/iree-build-compiler/tools" CACHE STRING "" FORCE)
+# Include toolchain_build to get build_iree_compiler macro
+include(${TOOLCHAIN_TOP}/CMake/toolchain_build.cmake)
+build_iree_compiler()
 
 # Bare-metal platform defines
 add_compile_definitions(

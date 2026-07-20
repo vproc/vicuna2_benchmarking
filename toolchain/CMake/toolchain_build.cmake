@@ -218,3 +218,26 @@ macro(build_etiss)
                         WORKING_DIRECTORY ${TOOLCHAIN_TOP}/etiss_base/etiss_rvv/build)
     endif()
 endmacro()
+
+macro(build_iree_compiler)
+    if(NOT IREE_HOST_BIN_DIR)
+        set(IREE_HOST_BIN_DIR "${TOOLCHAIN_TOP}/iree_compiler/install/bin" CACHE PATH "Path to IREE compiler binaries" FORCE)
+    endif()
+
+    if(NOT EXISTS "${IREE_HOST_BIN_DIR}/iree-compile")
+        message(STATUS "IREE Compiler not found at ${IREE_HOST_BIN_DIR}, building natively from submodule")
+        
+        # Configure the IREE host compiler
+        execute_process(COMMAND cmake -G Ninja -B ${TOOLCHAIN_TOP}/iree_compiler/build -S ${TOOLCHAIN_TOP}/../benchmark_sources/generic_iree/iree/iree-source -DCMAKE_BUILD_TYPE=Release -DIREE_BUILD_TESTS=OFF -DIREE_BUILD_SAMPLES=OFF -DIREE_HAL_DRIVER_LOCAL_TASK=OFF -DCMAKE_INSTALL_PREFIX=${TOOLCHAIN_TOP}/iree_compiler/install)
+                        
+        # Build and install the IREE host compiler
+        # Using parallel build automatically with Ninja
+        execute_process(COMMAND cmake --build ${TOOLCHAIN_TOP}/iree_compiler/build --target install)
+        
+        if(NOT EXISTS "${IREE_HOST_BIN_DIR}/iree-compile")
+            message(FATAL_ERROR "Failed to build IREE compiler natively. Check the CMake logs.")
+        endif()
+    else()
+        message(STATUS "IREE Compiler found in ${IREE_HOST_BIN_DIR}")
+    endif()
+endmacro()

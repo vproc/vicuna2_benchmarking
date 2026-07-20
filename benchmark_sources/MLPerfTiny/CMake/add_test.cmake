@@ -327,7 +327,7 @@ macro(add_Benchmark_IREE_Spike TEST SOURCE_DIR TEST_BUILD_DIR)
     )
 
     # Locate IREE compiler
-    find_program(IREE_COMPILE_TOOL iree-compile HINTS ${IREE_COMPILER_BIN_DIR} REQUIRED)
+    find_program(IREE_COMPILE_TOOL iree-compile HINTS ${IREE_HOST_BIN_DIR} REQUIRED)
     find_program(XXD_TOOL xxd REQUIRED)
 
     # 3. Compile MLIR to VMFB
@@ -368,6 +368,7 @@ macro(add_Benchmark_IREE_Spike TEST SOURCE_DIR TEST_BUILD_DIR)
             --iree-llvmcpu-target-triple=riscv32-unknown-elf
             --iree-llvmcpu-target-abi=${RISCV_ABI}
             --iree-llvmcpu-target-cpu-features=${IREE_LLVM_FEATURES}
+            --iree-consteval-jit-target-device=local-sync
             -o ${TEST_VMFB}
         DEPENDS ${TEST_MLIR_SOURCE}
         COMMENT "Compiling ${TEST}_model.mlir -> ${TEST}_model.vmfb"

@@ -10,7 +10,7 @@ macro(add_IreeBenchmark_Spike TEST_NAME TEST_DIR)
     set(TEST_MAIN_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/../framework/main.cpp)
 
     # Find necessary tools
-    find_program(IREE_COMPILE_TOOL iree-compile HINTS ${IREE_COMPILER_BIN_DIR} REQUIRED)
+    find_program(IREE_COMPILE_TOOL iree-compile HINTS ${IREE_HOST_BIN_DIR} REQUIRED)
     find_program(XXD_TOOL xxd REQUIRED)
 
     # Generate IREE LLVM features based on RISCV_ARCH
@@ -49,6 +49,7 @@ macro(add_IreeBenchmark_Spike TEST_NAME TEST_DIR)
             --iree-llvmcpu-target-triple=riscv32-unknown-elf
             --iree-llvmcpu-target-abi=${RISCV_ABI}
             --iree-llvmcpu-target-cpu-features=${IREE_LLVM_FEATURES}
+            --iree-consteval-jit-target-device=local-sync
             -o ${TEST_VMFB}
         DEPENDS ${TEST_MLIR_SOURCE}
         COMMENT "Compiling ${TEST_NAME}.mlir -> ${TEST_NAME}.vmfb (${RISCV_ARCH})"
