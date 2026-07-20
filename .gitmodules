@@ -68,3 +68,7 @@
 [submodule "benchmark_sources/audiomark/audiomark"]
 	path = benchmark_sources/audiomark/audiomark
 	url = https://github.com/eembc/audiomark.git
+[submodule "benchmark_sources/generic_iree/iree/iree-source"]
+	path = benchmark_sources/generic_iree/iree/iree-source
+	url = https://github.com/efectn-forks/iree.git
+	branch = rv32-fixes
