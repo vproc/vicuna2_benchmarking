@@ -202,7 +202,8 @@ macro(add_Benchmark_Spike TEST SOURCE_DIR TEST_BUILD_DIR)
 
     target_include_directories(${TEST_NAME} PRIVATE
         ${SOURCE_DIR}
-        ${SOURCE_DIR}/model_data
+        ${SOURCE_DIR}/tflite
+        ${SOURCE_DIR}/${TEST}_data
         ${FRAMEWORK_TOP}/
     )
 
@@ -300,7 +301,7 @@ macro(add_Benchmark_IREE_Spike TEST SOURCE_DIR TEST_BUILD_DIR)
 
     set(TEST_NAME ${TEST}_IREE_Spike)
     
-    set(PREGENERATED_MLIR "${SOURCE_DIR}/${TEST}_data/${TEST}_model.mlir")
+    set(PREGENERATED_MLIR "${SOURCE_DIR}/iree/${TEST}_model.mlir")
     set(TEST_MLIR_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_model.mlir)
     set(TEST_VMFB ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_model.vmfb)
     set(TEST_C_HEADER ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_model.c)
@@ -311,7 +312,7 @@ macro(add_Benchmark_IREE_Spike TEST SOURCE_DIR TEST_BUILD_DIR)
                             "Example workflow:\n"
                             "  1. python3 CMake/extract_tflite.py ${SOURCE_DIR}/${TEST}_data/${TEST}_model_data.cc ${TEST}_model.tflite\n"
                             "  2. tosa-converter-for-tflite ${TEST}_model.tflite --text -o ${TEST}_model.mlir\n"
-                            "  3. mv ${TEST}_model.mlir ${SOURCE_DIR}/${TEST}_data/")
+                            "  3. mv ${TEST}_model.mlir ${SOURCE_DIR}/iree/")
     endif()
 
     message(STATUS "Found MLIR model at ${PREGENERATED_MLIR}, copying to build directory.")
@@ -388,6 +389,7 @@ macro(add_Benchmark_IREE_Spike TEST SOURCE_DIR TEST_BUILD_DIR)
 
     target_include_directories(${TEST_NAME} PRIVATE
         ${SOURCE_DIR}
+        ${SOURCE_DIR}/iree
         ${SOURCE_DIR}/${TEST}_data
         ${FRAMEWORK_TOP}/
         ${CMAKE_CURRENT_BINARY_DIR}

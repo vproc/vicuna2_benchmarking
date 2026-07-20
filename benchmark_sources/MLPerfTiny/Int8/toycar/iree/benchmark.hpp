@@ -1,122 +1,10 @@
 #ifndef BENCHMARK_HPP
-#define BENCHMARK_HPP 
+#define BENCHMARK_HPP
 
-#include <cstdint>
-//BSP includes
-//#include "uart.hpp"
-//Includes for benchmark
-
-#ifndef IREE_RUNTIME_ENABLED
-// TFLM framework includes (default).
-#include "tensorflow/lite/micro/tflite_bridge/micro_error_reporter.h"
-#include "tensorflow/lite/micro/micro_interpreter.h"
-#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
-#include "tensorflow/lite/schema/schema_generated.h"
-#else
-// IREE framework: use generic definitions.
-// TODO: IREE runtime harness implementation to replace TFLM-specific code below.
-namespace tflite {
-  enum TfLiteStatus { kTfLiteOk = 0, kTfLiteError = 1 };
-}
-#endif // IREE_RUNTIME_ENABLED
-
-#include "toycar_int8_data/toycar_int8_input_data.h"
-#include "toycar_int8_data/toycar_int8_model_data.h"
-#include "toycar_int8_data/toycar_int8_model_settings.h"
-#include "toycar_int8_data/toycar_int8_output_data_ref.h"
-
-//Due to scoping/dynamic allocation issue with tflm, unfortunately need to include simulator specific  in this file
+#include "toycar_int8_model_settings.h"
+#include "toycar_int8_input_data.h"
+#include "toycar_int8_output_data_ref.h"
 #include "simulator.hpp"
-
-#ifndef IREE_RUNTIME_ENABLED
-
-class Benchmark
-{
-    private:
-    /*
-    * Private Helper Functions and variables
-    */
-    static constexpr size_t tensor_arena_size = 256 * 1024;
-    alignas(16) uint8_t tensor_arena[tensor_arena_size];
-
-    const tflite::Model *model;
-    tflite::MicroInterpreter *interpreter_ptr;
-
-    public:
-    /*
-    * Required Functions for test framework
-    */
-    //
-    Benchmark(){
-        };
-
-    //Call code to be benchmarked
-    inline int run_benchmark()
-    {
-        //Due to scoping issue for the tflite::MicroInterpreter, init must be inside here.  Fixes to dynamic allocation should allow this to be separated correctly
-        model = tflite::GetModel(toycar_int8_model_data);
-        static tflite::MicroMutableOpResolver<1> resolver;
-        resolver.AddFullyConnected();
-        tflite::MicroInterpreter interpreter(model, resolver, tensor_arena, tensor_arena_size);
-        if (interpreter.AllocateTensors() != kTfLiteOk)
-        {
-            return 1;
-            //uart_printf("Failed to allocate tensors!\n");
-        }
-        memcpy(interpreter.input(0)->data.int8, (int8_t *)toycar_int8_input_data[0], toycar_int8_input_data_len[0]); //Only one test case
-
-        Simulator simulator; //need to initialize simulator internally
-        //Restart measurement
-        simulator.begin_measurement();
-
-        if (interpreter.Invoke() != kTfLiteOk)
-        {
-            //uart_printf("Failed in Invoke!\n");
-            return 2;
-        } 
-        //End measurement for real
-        simulator.end_measurement();
-
-
-        // Due to scoping issue, validation also inside this function
-        int32_t sum = 0;
-        for (size_t j = 0; j < toycar_int8_input_data_len[0]; j++)
-        {
-            int32_t diff1 = (int8_t)toycar_int8_input_data[0][j] - (int8_t)interpreter.output(0)->data.int8[j];
-            int32_t square = diff1*diff1;
-            sum += square;
-        }
-        sum /= toycar_int8_input_data_len[0];
-
-        int32_t diff = abs(sum - toycar_int8_output_data_ref[0]);
-        
-        if (diff > 1)
-        {
-            //uart_printf("ERROR: at #%d, sum %d ref %d diff %d \n", 0, sum, toycar_int8_output_data_ref[0], diff);
-            simulator.terminate(1); //Terminate simulation with return code 1 instead of returning (due to scoping problem)
-            return 3;
-        }
-        else
-        {
-            //uart_printf("Sample #%d pass, sum %d ref %d diff %d \n", 0, sum, toycar_int8_output_data_ref[0], diff);
-            simulator.terminate(0); //Terminate simulation with return code 0 instead of returning (due to scoping problem)
-            return 0;
-        }
-
-    };
-
-    //Validate Output
-    int validate_benchmark()
-    {
-        //Not used due to scoping issue
-        return true;
-    };
-    //Cleanup any allocatations
-    ~Benchmark(){
-    };
-};
-
-#else
 
 // IREE framework stub implementation
 #include "iree/base/api.h"
@@ -125,6 +13,8 @@ class Benchmark
 #include "iree/runtime/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/module.h"
+
+#include <stdlib.h> // For abs()
 
 extern "C" {
     extern const unsigned char iree_model_vmfb[];
@@ -190,7 +80,7 @@ class Benchmark
             (iree_hal_buffer_params_t){.usage = IREE_HAL_BUFFER_USAGE_DEFAULT,
                                        .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL},
             iree_make_const_byte_span(toycar_int8_input_data[0], toycar_int8_input_data_len[0]), &arg0);
-        
+
         if (!iree_status_is_ok(status)) return 2;
         iree_runtime_call_inputs_push_back_buffer_view(&call, arg0);
         iree_hal_buffer_view_release(arg0);
@@ -217,11 +107,11 @@ class Benchmark
         iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(ret0);
         iree_hal_buffer_mapping_t mapping;
         int result = 0;
-        
+
         if (iree_status_is_ok(iree_hal_buffer_map_range(
                 buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
                 0, toycar_int8_input_data_len[0], &mapping))) {
-            
+
             const int8_t* out_ptr = (const int8_t*)mapping.contents.data;
             int32_t sum = 0;
             for (size_t j = 0; j < toycar_int8_input_data_len[0]; j++) {
@@ -257,6 +147,4 @@ class Benchmark
     }
 };
 
-#endif // IREE_RUNTIME_ENABLED
-
-#endif
+#endif // BENCHMARK_HPP
