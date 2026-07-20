@@ -300,55 +300,30 @@ macro(add_Benchmark_IREE_Spike TEST SOURCE_DIR TEST_BUILD_DIR)
 
     set(TEST_NAME ${TEST}_IREE_Spike)
     
-    # Allow external override of TOSA_CONVERTER_PATH
-    set(TOSA_CONVERTER_PATH "/home/efectn/iree-prod-test/demo-simple-mlir/tensorflow_model/myenv/bin" CACHE PATH "Path to the directory containing tosa-converter-for-tflite")
-
     set(PREGENERATED_MLIR "${SOURCE_DIR}/${TEST}_data/${TEST}_model.mlir")
     set(TEST_MLIR_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_model.mlir)
     set(TEST_VMFB ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_model.vmfb)
     set(TEST_C_HEADER ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_model.c)
 
-    if(EXISTS "${PREGENERATED_MLIR}")
-        message(STATUS "Found pre-generated MLIR model at ${PREGENERATED_MLIR}, skipping TFLite extraction and TOSA conversion.")
-        
-        # Copy the pregenerated MLIR to the build directory so the pipeline can continue smoothly
-        add_custom_command(
-            OUTPUT ${TEST_MLIR_SOURCE}
-            COMMAND ${CMAKE_COMMAND} -E copy ${PREGENERATED_MLIR} ${TEST_MLIR_SOURCE}
-            DEPENDS ${PREGENERATED_MLIR}
-            COMMENT "Copying pre-generated MLIR model to build directory"
-            VERBATIM
-        )
-    else()
-        message(STATUS "Pre-generated MLIR model not found at ${PREGENERATED_MLIR}. Setting up TFLite to MLIR conversion pipeline.")
-        # Locate TFLite to MLIR converter (tosa-converter-for-tflite)
-        find_program(TOSA_CONVERTER tosa-converter-for-tflite
-                     HINTS ${TOSA_CONVERTER_PATH}
-                     REQUIRED)
-        find_package(Python3 REQUIRED)
-
-        set(TEST_TFLITE_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_model.tflite)
-
-        # 1. Extract TFLite from model_data.cc
-        add_custom_command(
-            OUTPUT ${TEST_TFLITE_SOURCE}
-            COMMAND Python3::Interpreter ${CMAKE_CURRENT_SOURCE_DIR}/CMake/extract_tflite.py
-                ${SOURCE_DIR}/${TEST}_data/${TEST}_model_data.cc
-                ${TEST_TFLITE_SOURCE}
-            DEPENDS ${SOURCE_DIR}/${TEST}_data/${TEST}_model_data.cc ${CMAKE_CURRENT_SOURCE_DIR}/CMake/extract_tflite.py
-            COMMENT "Extracting ${TEST}_model.tflite from model_data.cc"
-            VERBATIM
-        )
-
-        # 2. Convert TFLite to MLIR
-        add_custom_command(
-            OUTPUT ${TEST_MLIR_SOURCE}
-            COMMAND ${TOSA_CONVERTER} ${TEST_TFLITE_SOURCE} --text -o ${TEST_MLIR_SOURCE}
-            DEPENDS ${TEST_TFLITE_SOURCE}
-            COMMENT "Converting ${TEST}_model.tflite -> ${TEST}_model.mlir via TOSA"
-            VERBATIM
-        )
+    if(NOT EXISTS "${PREGENERATED_MLIR}")
+        message(FATAL_ERROR "MLIR model not found at ${PREGENERATED_MLIR}!\n"
+                            "Please extract the .tflite from model_data.cc and convert it to MLIR via TOSA converter.\n"
+                            "Example workflow:\n"
+                            "  1. python3 CMake/extract_tflite.py ${SOURCE_DIR}/${TEST}_data/${TEST}_model_data.cc ${TEST}_model.tflite\n"
+                            "  2. tosa-converter-for-tflite ${TEST}_model.tflite --text -o ${TEST}_model.mlir\n"
+                            "  3. mv ${TEST}_model.mlir ${SOURCE_DIR}/${TEST}_data/")
     endif()
+
+    message(STATUS "Found MLIR model at ${PREGENERATED_MLIR}, copying to build directory.")
+    
+    # Copy the MLIR to the build directory so the pipeline can continue smoothly
+    add_custom_command(
+        OUTPUT ${TEST_MLIR_SOURCE}
+        COMMAND ${CMAKE_COMMAND} -E copy ${PREGENERATED_MLIR} ${TEST_MLIR_SOURCE}
+        DEPENDS ${PREGENERATED_MLIR}
+        COMMENT "Copying MLIR model to build directory"
+        VERBATIM
+    )
 
     # Locate IREE compiler
     find_program(IREE_COMPILE_TOOL iree-compile HINTS ${IREE_COMPILER_BIN_DIR} REQUIRED)
