@@ -16,8 +16,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+# TFLM framework tests (always built).
 add_Benchmark(toycar_int8 ${CMAKE_CURRENT_SOURCE_DIR} ${BUILD_DIR}/benchmark_sources/Int8/toycar)
 add_Benchmark_Spike(toycar_int8 ${CMAKE_CURRENT_SOURCE_DIR} ${BUILD_DIR}/benchmark_sources/Int8/toycar)
+
+# IREE framework tests (deferred - requires IREE-specific benchmark implementation).
+# TODO: Add IREE benchmark test targets when framework-specific benchmark code is ready.
+
 
 
 
