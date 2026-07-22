@@ -16,7 +16,8 @@ macro(add_Benchmark TEST SOURCE_DIR TEST_BUILD_DIR)
 
     target_include_directories(${TEST_NAME} PRIVATE
         ${SOURCE_DIR}
-        ${SOURCE_DIR}/model_data
+        ${SOURCE_DIR}/${TEST}_data
+        ${SOURCE_DIR}/tflite
         ${FRAMEWORK_TOP}/
     )
 
@@ -293,6 +294,183 @@ macro(add_benchmark_etiss TEST SOURCE_DIR)
             -i${FRAMEWORK_TOP}/etiss/etiss.ini 
             --vp.elf_file=${BINARY_DIR}/${TEST_NAME}.elf
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+endmacro()
+
+macro(add_Benchmark_IREE_Verilator TEST SOURCE_DIR TEST_BUILD_DIR)
+    # Check if verilator model is built
+    if(NOT EXISTS "${VERILATOR_MODEL_DIR}/build/verilated_model")
+        message(FATAL_ERROR "Verilator Model executable not present!  Build it and try again.")
+    endif()
+
+    set(TEST_NAME ${TEST}_IREE_Verilator)
+    set(TEST_MLIR_SOURCE ${SOURCE_DIR}/iree/${TEST}_model.mlir)
+    set(TEST_VMFB ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.vmfb)
+    set(TEST_C_HEADER ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.c)
+    set(PREGENERATED_MLIR ${SOURCE_DIR}/iree/${TEST}_model.mlir)
+
+    if(NOT EXISTS "${PREGENERATED_MLIR}")
+        message(FATAL_ERROR "MLIR model not found at ${PREGENERATED_MLIR}!")
+    endif()
+
+    message(STATUS "Found MLIR model at ${PREGENERATED_MLIR}, copying to build directory.")
+    
+    add_custom_command(
+        OUTPUT ${TEST_MLIR_SOURCE}
+        COMMAND ${CMAKE_COMMAND} -E copy ${PREGENERATED_MLIR} ${TEST_MLIR_SOURCE}
+        DEPENDS ${PREGENERATED_MLIR}
+        COMMENT "Copying MLIR model to build directory"
+        VERBATIM
+    )
+
+    find_program(IREE_COMPILE_TOOL iree-compile HINTS ${IREE_HOST_BIN_DIR} REQUIRED)
+    find_program(XXD_TOOL xxd REQUIRED)
+
+    # Compile MLIR to VMFB
+    string(REGEX MATCH "m" HAS_M ${RISCV_ARCH})
+    string(REGEX MATCH "f" HAS_F ${RISCV_ARCH})
+    string(REGEX MATCH "zve32x" HAS_ZVE32X ${RISCV_ARCH})
+    string(REGEX MATCH "zve32f" HAS_ZVE32F ${RISCV_ARCH})
+
+    set(IREE_LLVM_FEATURES "")
+    if(HAS_M)
+        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+m")
+    endif()
+    if(HAS_F)
+        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+f")
+    endif()
+    if(HAS_ZVE32X)
+        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+zve32x")
+    endif()
+    if(HAS_ZVE32F)
+        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+zve32f")
+    endif()
+    if(HAS_ZVE32X OR HAS_ZVE32F)
+        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+zvl${VREG_W}b")
+    endif()
+
+    string(REGEX REPLACE "^," "" IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES}")
+
+    add_custom_command(
+        OUTPUT ${TEST_VMFB}
+        COMMAND ${IREE_COMPILE_TOOL}
+            ${TEST_MLIR_SOURCE}
+            --iree-hal-target-device=local
+            --iree-hal-local-target-device-backends=llvm-cpu
+            --iree-llvmcpu-target-triple=riscv32-unknown-elf
+            --iree-llvmcpu-target-abi=${RISCV_ABI}
+            "--iree-llvmcpu-target-cpu-features=${IREE_LLVM_FEATURES}"
+            # --iree-consteval-jit-target-device=local-sync
+            -o ${TEST_VMFB}
+        DEPENDS ${TEST_MLIR_SOURCE}
+        COMMENT "Compiling ${TEST}_model.mlir -> ${TEST}_model.vmfb"
+        VERBATIM
+    )
+
+    add_custom_command(
+        OUTPUT ${TEST_C_HEADER}
+        COMMAND ${XXD_TOOL} -i ${TEST_VMFB} ${TEST_C_HEADER}
+        COMMAND sed -i "s/_.*_${TEST_NAME}_vmfb/iree_model_vmfb/g" ${TEST_C_HEADER}
+        COMMAND sed -i "s/_.*_${TEST_NAME}_vmfb_len/iree_model_vmfb_len/g" ${TEST_C_HEADER}
+        DEPENDS ${TEST_VMFB}
+        COMMENT "Generating ${TEST_NAME}.c from ${TEST_NAME}.vmfb"
+        VERBATIM
+    )
+
+    add_executable(${TEST_NAME})
+
+    target_include_directories(${TEST_NAME} PRIVATE
+        ${SOURCE_DIR}
+        ${SOURCE_DIR}/iree
+        ${SOURCE_DIR}/${TEST}_data
+        ${FRAMEWORK_TOP}/
+        ${CMAKE_CURRENT_BINARY_DIR}
+    )
+
+    set(IREE_WRAPPER_SOURCE ${FRAMEWORK_TOP}/main.cpp)
+
+    target_sources(${TEST_NAME} PUBLIC
+        ${IREE_WRAPPER_SOURCE}
+        ${TEST_C_HEADER}
+        ${CMAKE_CURRENT_SOURCE_DIR}/../generic_iree/baremetal/baremetal_stubs.c
+        ${SOURCE_DIR}/${TEST}_data/${TEST}_input_data.cc
+        ${SOURCE_DIR}/${TEST}_data/${TEST}_model_settings.cc
+        ${SOURCE_DIR}/${TEST}_data/${TEST}_output_data_ref.cc
+    )
+
+    set_source_files_properties(${IREE_WRAPPER_SOURCE} PROPERTIES
+        OBJECT_DEPENDS "${TEST_C_HEADER};${TEST_VMFB}"
+    )
+
+    target_compile_definitions(${TEST_NAME} PRIVATE 
+        IREE_RUNTIME_ENABLED=1
+        IREE_PLATFORM_GENERIC=1
+        IREE_FILE_IO_ENABLE=0
+        IREE_DEVICE_SIZE_T=uint32_t
+        PRIdsz=PRIu32
+        IREE_SOCKETS_ENABLE=0
+        "IREE_TIME_NOW_FN={ return 0\\; }"
+    )
+
+    target_compile_features(${TEST_NAME} PRIVATE cxx_std_14)
+    target_compile_options(${TEST_NAME} PRIVATE -fno-builtin)
+
+    # Set Linker
+    target_link_options(${TEST_NAME} PRIVATE "-nostartfiles")
+    if (${COMPILER} STREQUAL "LLVM")
+        target_compile_options(${TEST_NAME} PRIVATE "-fno-use-cxa-atexit")
+    endif()
+    
+    # We use vicuna_bsp linker script for verilator
+    target_link_options(${TEST_NAME} PRIVATE "-T${VICUNA_BSP_TOP}/lld_link.ld")
+    
+    # Link IREE runtime and sim libraries
+    target_link_libraries(${TEST_NAME} PRIVATE 
+        bsp_Vicuna 
+        UART_Vicuna 
+        sim_Verilator
+        -Wl,--start-group
+        iree_runtime_unified
+        iree_base_base
+        flatcc_parsing
+        flatcc_runtime
+        -Wl,--end-group
+        m
+    )   
+
+    # Add objcopy and srec commands for Verilator
+    add_custom_command(TARGET ${TEST_NAME}
+                       POST_BUILD
+                       COMMAND ${CMAKE_OBJCOPY} -O binary ${TEST_NAME}.elf ${TEST_NAME}.bin
+                       COMMAND srec_cat ${TEST_NAME}.bin -binary -offset 0x0000 -byte-swap 4 -o ${TEST_NAME}.vmem -vmem
+                       COMMAND rm -f prog_${TEST_NAME}.txt
+                       COMMAND echo -n "${TEST_BUILD_DIR}/${TEST_NAME}.vmem ${TEST_BUILD_DIR}/${TEST_NAME}_unused.txt " > prog_${TEST_NAME}.txt
+                       COMMAND readelf -s ${TEST_NAME}.elf | sed '2,13 s/ //1' | grep vref_start | cut -d " " -f 6 | tr [=["\n"]=] " " >> prog_${TEST_NAME}.txt
+                       COMMAND readelf -s ${TEST_NAME}.elf | sed '2,13 s/ //1' | grep vref_end | cut -d " " -f 6 | tr [=["\n"]=] " " >> prog_${TEST_NAME}.txt
+                       COMMAND echo -n "${TEST_BUILD_DIR}/${TEST_NAME}_vicuna_sim_out.txt " >> prog_${TEST_NAME}.txt
+                       COMMAND readelf -s ${TEST_NAME}.elf | sed '2,13 s/ //1' | grep vdata_start | cut -d " " -f 6 | tr [=["\n"]=] " " >> prog_${TEST_NAME}.txt
+                       COMMAND readelf -s ${TEST_NAME}.elf | sed '2,13 s/ //1' | grep vdata_end | cut -d " " -f 6 | tr [=["\n"]=] " " >> prog_${TEST_NAME}.txt
+                       COMMAND ${CMAKE_OBJDUMP} -D ${TEST_NAME}.elf > ${TEST_NAME}_dump.txt
+                       )
+
+    set(INST_TRACE_ARGS "${TEST_BUILD_DIR}/inst_trace.txt")
+
+    if(TRACE)
+        message("${TEST_BUILD_DIR}/last_test_sig.vcd")
+        set(MEM_TRACE_ARGS "${TEST_BUILD_DIR}/last_test_mem.csv")
+        set(VCD_TRACE_ARGS "${TEST_BUILD_DIR}last_test_sig.vcd")
+    else()
+        set(MEM_TRACE_ARGS "")
+        set(VCD_TRACE_ARGS "")
+    endif()
+
+    # Add Test
+    add_test(NAME ${TEST_NAME} 
+             COMMAND ./${VERILATOR_MODEL_DIR}/build/verilated_model ${TEST_BUILD_DIR}/prog_${TEST_NAME}.txt ${MEM_W} 4194304 ${MEM_LATENCY} 1 toycar ${VREG_W} 0 ${VCD_TRACE_ARGS}
+             WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../..)
+             
+    set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 1000)
+
+    message(STATUS "Successfully added ${TEST_NAME}")
 endmacro()
 
 macro(add_Benchmark_IREE_Spike TEST SOURCE_DIR TEST_BUILD_DIR)

@@ -26,5 +26,6 @@ include(CMake/add_test.cmake)
 
 # Add tests
 add_IreeBenchmark_Spike(add_vector ${CMAKE_CURRENT_SOURCE_DIR}/tests/add_vector)
+add_IreeBenchmark_Verilator(add_vector ${CMAKE_CURRENT_SOURCE_DIR}/tests/add_vector)
 
 message(STATUS "generic_iree test suite configured successfully")

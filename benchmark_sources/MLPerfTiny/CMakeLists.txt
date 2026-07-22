@@ -59,10 +59,11 @@ elseif(${FRAMEWORK} STREQUAL "IREE")
     # Use generic_iree's IREE build instead of a duplicate folder
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../generic_iree/iree ${CMAKE_BINARY_DIR}/iree)
     
-    # IREE runtime hedefinün bulunduğunu kontrol et
+    # Check if IREE runtime has been found
     if(TARGET iree::runtime::unified)
         message(STATUS "Building MLPerfTiny with IREE backend")
         add_Benchmark_IREE_Spike(toycar_int8 ${CMAKE_CURRENT_SOURCE_DIR}/Int8/toycar/ ${BINARY_DIR})
+        add_Benchmark_IREE_Verilator(toycar_int8 ${CMAKE_CURRENT_SOURCE_DIR}/Int8/toycar/ ${BINARY_DIR})
     else()
         message(WARNING "IREE runtime target not available, skipping IREE benchmarks")
     endif()

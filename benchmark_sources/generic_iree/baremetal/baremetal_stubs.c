@@ -39,10 +39,6 @@ void* sbrk(ptrdiff_t incr) {
   return _sbrk(incr);
 }
 
-void _exit(int status) {
-  while (1) { __asm__ volatile ("wfi"); }
-}
-
 void _exit_r(struct _reent* r, int status) {
   _exit(status);
 }
