@@ -93,14 +93,14 @@ class Benchmark
         simulator.end_measurement();
 
         if (!iree_status_is_ok(status)) {
-            simulator.terminate(1);
+            simulator.terminate(11);
             return 3;
         }
 
         iree_hal_buffer_view_t* ret0 = nullptr;
         status = iree_runtime_call_outputs_pop_front_buffer_view(&call, &ret0);
         if (!iree_status_is_ok(status) || !ret0) {
-            simulator.terminate(1);
+            simulator.terminate(13);
             return 4;
         }
 
@@ -122,7 +122,7 @@ class Benchmark
             int32_t diff = abs(sum - (int32_t)toycar_int8_output_data_ref[0]);
 
             if (diff > 1) {
-                simulator.terminate(1);
+                simulator.terminate(16);
                 result = 5;
             } else {
                 simulator.terminate(0);
@@ -130,7 +130,7 @@ class Benchmark
             }
             iree_hal_buffer_unmap_range(&mapping);
         } else {
-            simulator.terminate(1);
+            simulator.terminate(12);
             result = 6;
         }
 

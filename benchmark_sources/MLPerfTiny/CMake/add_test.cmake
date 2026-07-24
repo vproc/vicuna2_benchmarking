@@ -303,7 +303,7 @@ macro(add_Benchmark_IREE_Verilator TEST SOURCE_DIR TEST_BUILD_DIR)
     endif()
 
     set(TEST_NAME ${TEST}_IREE_Verilator)
-    set(TEST_MLIR_SOURCE ${SOURCE_DIR}/iree/${TEST}_model.mlir)
+    set(TEST_MLIR_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_model.mlir)
     set(TEST_VMFB ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.vmfb)
     set(TEST_C_HEADER ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.c)
     set(PREGENERATED_MLIR ${SOURCE_DIR}/iree/${TEST}_model.mlir)
@@ -359,7 +359,7 @@ macro(add_Benchmark_IREE_Verilator TEST SOURCE_DIR TEST_BUILD_DIR)
             --iree-llvmcpu-target-triple=riscv32-unknown-elf
             --iree-llvmcpu-target-abi=${RISCV_ABI}
             "--iree-llvmcpu-target-cpu-features=${IREE_LLVM_FEATURES}"
-            # --iree-consteval-jit-target-device=local-sync
+            --iree-consteval-jit-target-device=local-sync
             -o ${TEST_VMFB}
         DEPENDS ${TEST_MLIR_SOURCE}
         COMMENT "Compiling ${TEST}_model.mlir -> ${TEST}_model.vmfb"
@@ -368,9 +368,7 @@ macro(add_Benchmark_IREE_Verilator TEST SOURCE_DIR TEST_BUILD_DIR)
 
     add_custom_command(
         OUTPUT ${TEST_C_HEADER}
-        COMMAND ${XXD_TOOL} -i ${TEST_VMFB} ${TEST_C_HEADER}
-        COMMAND sed -i "s/_.*_${TEST_NAME}_vmfb/iree_model_vmfb/g" ${TEST_C_HEADER}
-        COMMAND sed -i "s/_.*_${TEST_NAME}_vmfb_len/iree_model_vmfb_len/g" ${TEST_C_HEADER}
+        COMMAND ${XXD_TOOL} -i -n iree_model_vmfb ${TEST_VMFB} ${TEST_C_HEADER}
         DEPENDS ${TEST_VMFB}
         COMMENT "Generating ${TEST_NAME}.c from ${TEST_NAME}.vmfb"
         VERBATIM
@@ -452,20 +450,25 @@ macro(add_Benchmark_IREE_Verilator TEST SOURCE_DIR TEST_BUILD_DIR)
                        COMMAND ${CMAKE_OBJDUMP} -D ${TEST_NAME}.elf > ${TEST_NAME}_dump.txt
                        )
 
-    set(INST_TRACE_ARGS "${TEST_BUILD_DIR}/inst_trace.txt")
-
     if(TRACE)
-        message("${TEST_BUILD_DIR}/last_test_sig.vcd")
-        set(MEM_TRACE_ARGS "${TEST_BUILD_DIR}/last_test_mem.csv")
-        set(VCD_TRACE_ARGS "${TEST_BUILD_DIR}last_test_sig.vcd")
+        set(VCD_TRACE_FLAG "--trace")
+        set(VCD_TRACE_ARG "${TEST_BUILD_DIR}/test_${TEST_NAME}_Verilator_sig.vcd")
     else()
-        set(MEM_TRACE_ARGS "")
-        set(VCD_TRACE_ARGS "")
+        set(VCD_TRACE_FLAG "")
+        set(VCD_TRACE_ARG "")
+    endif()
+
+     if(COMMIT_LOG)
+        set(COMMIT_FLAG "--commit")
+        set(COMMIT_ARG "${TEST_BUILD_DIR}/")
+    else()
+        set(COMMIT_FLAG "")
+        set(COMMIT_ARG "")
     endif()
 
     # Add Test
     add_test(NAME ${TEST_NAME} 
-             COMMAND ./${VERILATOR_MODEL_DIR}/build/verilated_model ${TEST_BUILD_DIR}/prog_${TEST_NAME}.txt ${MEM_W} 4194304 ${MEM_LATENCY} 1 toycar ${VREG_W} 0 ${VCD_TRACE_ARGS}
+             COMMAND ./${VERILATOR_MODEL_DIR}/build/verilated_model ${TEST_BUILD_DIR}/prog_${TEST_NAME}.txt ${MEM_PORTS} ${MEM_W} 4194304 ${MEM_LATENCY} 1 ${TEST_NAME} ${VREG_W} 0 ${VCD_TRACE_FLAG} ${VCD_TRACE_ARG} ${COMMIT_FLAG} ${COMMIT_ARG}
              WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../..)
              
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 1000)
@@ -556,9 +559,7 @@ macro(add_Benchmark_IREE_Spike TEST SOURCE_DIR TEST_BUILD_DIR)
     # 4. Generate C array from VMFB
     add_custom_command(
         OUTPUT ${TEST_C_HEADER}
-        COMMAND ${XXD_TOOL} -i ${TEST_VMFB} ${TEST_C_HEADER}
-        COMMAND sed -i "s/_.*_${TEST}_model_vmfb/iree_model_vmfb/g" ${TEST_C_HEADER}
-        COMMAND sed -i "s/_.*_${TEST}_model_vmfb_len/iree_model_vmfb_len/g" ${TEST_C_HEADER}
+        COMMAND ${XXD_TOOL} -i -n iree_model_vmfb ${TEST_VMFB} ${TEST_C_HEADER}
         DEPENDS ${TEST_VMFB}
         COMMENT "Generating ${TEST}_model.c from ${TEST}_model.vmfb"
         VERBATIM
@@ -579,7 +580,7 @@ macro(add_Benchmark_IREE_Spike TEST SOURCE_DIR TEST_BUILD_DIR)
     target_sources(${TEST_NAME} PUBLIC
         ${IREE_WRAPPER_SOURCE}
         ${TEST_C_HEADER}
-        ${FRAMEWORK_TOP}/spike/crt0.S
+        ${FRAMEWORK_TOP}/vicuna2_bsp/crt0.S 
         ${CMAKE_CURRENT_SOURCE_DIR}/../generic_iree/baremetal/baremetal_stubs.c
         ${SOURCE_DIR}/${TEST}_data/${TEST}_input_data.cc
         ${SOURCE_DIR}/${TEST}_data/${TEST}_model_settings.cc
@@ -606,7 +607,7 @@ macro(add_Benchmark_IREE_Spike TEST SOURCE_DIR TEST_BUILD_DIR)
 
     # Set Linker
     target_link_options(${TEST_NAME} PRIVATE "-nostartfiles")
-    target_link_options(${TEST_NAME} PRIVATE "-T${FRAMEWORK_TOP}/spike/lld_link.ld")
+    target_link_options(${TEST_NAME} PRIVATE "-T${FRAMEWORK_TOP}/vicuna2_bsp/lld_link.ld")
     
     if (${COMPILER} STREQUAL "LLVM")
         target_compile_options(${TEST_NAME} PRIVATE "-fno-use-cxa-atexit")
@@ -628,9 +629,15 @@ macro(add_Benchmark_IREE_Spike TEST SOURCE_DIR TEST_BUILD_DIR)
                        POST_BUILD
                        COMMAND ${CMAKE_OBJDUMP} -D ${TEST_NAME}.elf > ${TEST_NAME}_dump.txt)    
 
+    if(COMMIT_LOG) 
+        set(SPIKE_COMMIT_LOG_ARGS "--log-commits" "--log=${TEST_BUILD_DIR}/${TEST_NAME}_commit_log.txt")
+    else()
+        set(SPIKE_COMMIT_LOG_ARGS "")
+    endif()
+
     # Add Test
     add_test(NAME ${TEST_NAME} 
-             COMMAND ${TOOLCHAIN_TOP}/spike/bin/spike --isa=${RISCV_ARCH}_zvl${VREG_W}b ${TEST_BUILD_DIR}/${TEST_NAME}.elf 
+             COMMAND ${TOOLCHAIN_TOP}/spike/bin/spike --isa=${RISCV_ARCH}_zvl${VREG_W}b ${SPIKE_COMMIT_LOG_ARGS} ${TEST_BUILD_DIR}/${TEST_NAME}.elf 
              WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../..)
              
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 0)

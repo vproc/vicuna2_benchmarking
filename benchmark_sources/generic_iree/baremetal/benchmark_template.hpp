@@ -106,7 +106,8 @@ class Benchmark
     private:
     iree_runtime_instance_t* instance = nullptr;
     iree_runtime_session_t* session = nullptr;
-    iree_runtime_call_t call;
+    iree_runtime_call_t call = {0};
+    bool call_initialized = false;
     iree_allocator_t allocator;
 
     public:
@@ -145,10 +146,12 @@ class Benchmark
 
         status = iree_runtime_call_initialize_by_name(
             session, iree_make_cstring_view(TEST_FUNCTION_NAME), &call);
+        if (!iree_status_is_ok(status)) return;
+        call_initialized = true;
     }
 
     inline int run_benchmark() {
-        if (!instance || !session) return 1;
+        if (!instance || !session || !call_initialized) return 1;
 
         iree_hal_allocator_t* device_allocator = iree_runtime_session_device_allocator(session);
 
@@ -202,7 +205,7 @@ class Benchmark
 
     ~Benchmark() {
         TEST_CLEANUP();
-        iree_runtime_call_deinitialize(&call);
+        if (call_initialized) iree_runtime_call_deinitialize(&call);
         if (session) iree_runtime_session_release(session);
         if (instance) iree_runtime_instance_release(instance);
     }

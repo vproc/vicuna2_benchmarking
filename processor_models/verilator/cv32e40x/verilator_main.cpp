@@ -9,6 +9,7 @@
 #include <getopt.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "verilated.h"
 #include "verilator_support_cv32e40x.h"
