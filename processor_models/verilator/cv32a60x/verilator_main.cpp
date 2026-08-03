@@ -438,7 +438,7 @@ int main(int argc, char **argv) {
                 break;
 
             } else {
-                fprintf(stderr, "ERROR: TEST FAILURE - FAILED OUTPUT VALIDATION\n");
+                fprintf(stderr, "ERROR: TEST FAILURE - FAILED OUTPUT VALIDATION - Exit Code: %u\n", (unsigned char)w_port);
                 exit_code = 1;
                 break; //For benchmarks, only 1 test
             }
@@ -492,6 +492,7 @@ int main(int argc, char **argv) {
         fclose(fxreglog);
     }
     top->final();
+
     free(prog_path);
     free(ref_path);
     free(dump_path);
@@ -499,6 +500,7 @@ int main(int argc, char **argv) {
     free(mem);
     free(mem_rvalid_queue);
     free(vec_mem_rvalid_queue);
+
     for(int queue_pos = 0; queue_pos < mem_latency; queue_pos++)
     {
         free(mem_rdata_queue[queue_pos]);
@@ -508,6 +510,7 @@ int main(int argc, char **argv) {
 
         
     }
+
     for(int p = 0; p < mem_ports; p++){
         for(int queue_pos = 0; queue_pos < mem_latency; queue_pos++){
             free(vec_mem_rdata_queue[p][queue_pos]);
@@ -516,6 +519,7 @@ int main(int argc, char **argv) {
         free(vec_mem_rdata_queue[p]);
         free(vec_mem_meta_queue[p]);
     }
+
     free(mem_rdata_queue);
     free(mem_idata_queue);
     free(mem_meta_queue);

@@ -826,7 +826,7 @@ module vproc_top import vproc_pkg::*, obi_pkg::*; #(
     logic                sdata_waiting;
     logic                vdata_waiting;
     logic [31:0]         sdata_wait_addr;
-    assign sdata_hold = ~USE_XIF_MEM & (vdata_req | (vect_pending_load & sdata_we));
+    assign sdata_hold = ~USE_XIF_MEM & (vdata_req[0] | (vect_pending_load & sdata_we));
     always_comb begin
         data_req[0]   = vdata_req[0] | (sdata_req & ~sdata_hold);
         data_addr[0]  = sdata_addr;

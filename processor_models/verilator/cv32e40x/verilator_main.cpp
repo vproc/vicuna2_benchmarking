@@ -289,7 +289,7 @@ int main(int argc, char **argv) {
         break;
 
       } else {
-        fprintf(stderr, "ERROR: TEST FAILURE - FAILED OUTPUT VALIDATION\n");
+        fprintf(stderr, "ERROR: TEST FAILURE - FAILED OUTPUT VALIDATION - Exit Code: %u\n", (unsigned char)w_port);
         exit_code = 1;
         break; // For benchmarks, only 1 test
       }
@@ -343,7 +343,10 @@ int main(int argc, char **argv) {
     // Outputs + Statistics
     //////////
 
-    // update_xreg_commit(top, fxreglog);
+    if (fxreglog != NULL) {
+      update_xreg_commit(top, fxreglog);
+    }
+    
     // update_freg_commit(top, ffreglog);
     // update_vreg_commit(top, vreg_w, fvreglog);
   }
