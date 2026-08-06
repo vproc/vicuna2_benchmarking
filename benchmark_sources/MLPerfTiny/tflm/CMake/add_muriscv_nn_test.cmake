@@ -22,6 +22,16 @@ macro(add_muriscv_nn_test TEST)
     get_target_property(_target_flags unity COMPILE_OPTIONS)
     list(REMOVE_ITEM _target_flags "-Werror")
     set_target_properties(unity PROPERTIES COMPILE_OPTIONS "-Wno-error {_target_flags} -Wno-error")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "(C|c?)lang")
+        target_link_options(unity PRIVATE 
+            "-nostdlib"
+            "-lc"
+            "-lsemihost"
+            "-lgcc"
+            "-lstdc++"
+            "-T${ETISS_CRT_TOP}/etiss.ld"
+        )
+    endif()
 
     add_executable(${TEST_NAME})
     
@@ -29,10 +39,6 @@ macro(add_muriscv_nn_test TEST)
     file(READ ${CMAKE_CURRENT_SOURCE_DIR}/muriscv-nn/Tests/TestCases/${TEST}/${TEST}.c FILE_CONTENT)
     string(REPLACE "int main" "int muriscv_nn_main" FILE_CONTENT "${FILE_CONTENT}")
     file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/TestCases/${TEST}/${TEST}.c "${FILE_CONTENT}")
-
-    # copy include files
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/muriscv-nn/Tests/TestData DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/muriscv-nn/Tests/Utils DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
     target_sources(${TEST_NAME} PUBLIC
         ${FRAMEWORK_TOP}/main.cpp
@@ -55,13 +61,24 @@ macro(add_muriscv_nn_test TEST)
     add_dependencies(${TEST_NAME} etiss_crt0)
     target_link_libraries(${TEST_NAME} PRIVATE tflm etiss_crt0 sim_etiss)
     
-    
-    target_link_options(${TEST_NAME} PRIVATE 
-        "-L${ETISS_CRT_LIB}"
-        "--specs=${ETISS_CRT_TOP}/etiss-semihost.specs"
-        "-T${ETISS_CRT_TOP}/etiss.ld"
-        "-nostartfiles"
-    )
+    if(CMAKE_CXX_COMPILER_ID MATCHES "(C|c?)lang")
+        target_link_options(${TEST_NAME} PRIVATE 
+            "-nostdlib"
+            "-lc"
+            "-lsemihost"
+            "-lgcc"
+            "-lstdc++"
+            "-L${ETISS_CRT_LIB}"
+            "-T${ETISS_CRT_TOP}/etiss.ld"
+        )
+    else()
+        target_link_options(${TEST_NAME} PRIVATE 
+            "-L${ETISS_CRT_LIB}"
+            "--specs=${ETISS_CRT_TOP}/etiss-semihost.specs"
+            "-T${ETISS_CRT_TOP}/etiss.ld"
+            "-nostartfiles"
+        )
+    endif()
 
     # put objdump in elf target
     add_custom_command(TARGET ${TEST_NAME}
@@ -75,5 +92,11 @@ macro(add_muriscv_nn_test TEST)
             ${TOOLCHAIN_TOP}/etiss_base/etiss_rvv/build/installed/bin/bare_etiss_processor 
             -i${FRAMEWORK_TOP}/etiss/etiss.ini 
             --vp.elf_file=${BINARY_DIR}/tflm/${TEST_NAME}.elf
+            --arch.cpu=RV32IMACFDV_zvl${VREG_W}b
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+endmacro()
+
+macro(prepare_muriscv_nn_tests)
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/muriscv-nn/Tests/TestData DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/muriscv-nn/Tests/Utils DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endmacro()
