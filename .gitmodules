@@ -65,3 +65,6 @@
 [submodule "scripts/etiss_perfsim_testing"]
 	path = scripts/etiss_perfsim_testing
 	url = git@github.com:danielschloms/rvv_testing.git
+[submodule "benchmark_sources/audiomark/audiomark"]
+	path = benchmark_sources/audiomark/audiomark
+	url = https://github.com/eembc/audiomark.git
