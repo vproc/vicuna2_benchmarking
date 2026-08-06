@@ -296,6 +296,85 @@ macro(add_benchmark_etiss TEST SOURCE_DIR)
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endmacro()
 
+macro(add_Benchmark_IREE_VMFB TEST SOURCE_DIR)
+    set(TEST_VMFB ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_IREE_shared.vmfb)
+    set(TEST_C_HEADER ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_IREE_shared.c)
+    set(TEST_MLIR_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_IREE_shared_model.mlir)
+    set(PREGENERATED_MLIR ${SOURCE_DIR}/iree/${TEST}_model.mlir)
+
+    if(NOT TARGET ${TEST}_IREE_vmfb)
+        if(NOT EXISTS "${PREGENERATED_MLIR}")
+            message(FATAL_ERROR "MLIR model not found at ${PREGENERATED_MLIR}!\n"
+                                "Please extract the .tflite from model_data.cc and convert it to MLIR via TOSA converter.\n"
+                                "Example workflow:\n"
+                                "  1. python3 CMake/extract_tflite.py ${SOURCE_DIR}/${TEST}_data/${TEST}_model_data.cc ${TEST}_model.tflite\n"
+                                "  2. tosa-converter-for-tflite ${TEST}_model.tflite --text -o ${TEST}_model.mlir\n"
+                                "  3. mv ${TEST}_model.mlir ${SOURCE_DIR}/iree/")
+        endif()
+
+        message(STATUS "Building one shared IREE VMFB for ${TEST} (Spike + Verilator)")
+        add_custom_command(
+            OUTPUT ${TEST_MLIR_SOURCE}
+            COMMAND ${CMAKE_COMMAND} -E copy ${PREGENERATED_MLIR} ${TEST_MLIR_SOURCE}
+            DEPENDS ${PREGENERATED_MLIR}
+            COMMENT "Copying MLIR model to build directory"
+            VERBATIM
+        )
+
+        find_program(IREE_COMPILE_TOOL iree-compile HINTS ${IREE_HOST_BIN_DIR} REQUIRED)
+        find_program(XXD_TOOL xxd REQUIRED)
+
+        string(REGEX MATCH "m" HAS_M ${RISCV_ARCH})
+        string(REGEX MATCH "f" HAS_F ${RISCV_ARCH})
+        string(REGEX MATCH "zve32x" HAS_ZVE32X ${RISCV_ARCH})
+        string(REGEX MATCH "zve32f" HAS_ZVE32F ${RISCV_ARCH})
+
+        set(IREE_LLVM_FEATURES "")
+        if(HAS_M)
+            set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+m")
+        endif()
+        if(HAS_F)
+            set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+f")
+        endif()
+        if(HAS_ZVE32X)
+            set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+zve32x")
+        endif()
+        if(HAS_ZVE32F)
+            set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+zve32f")
+        endif()
+        if(HAS_ZVE32X OR HAS_ZVE32F)
+            set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+zvl${VREG_W}b")
+        endif()
+
+        string(REGEX REPLACE "^," "" IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES}")
+
+        add_custom_command(
+            OUTPUT ${TEST_VMFB}
+            COMMAND ${IREE_COMPILE_TOOL}
+                ${TEST_MLIR_SOURCE}
+                --iree-hal-target-device=local
+                --iree-hal-local-target-device-backends=llvm-cpu
+                --iree-llvmcpu-target-triple=riscv32-unknown-elf
+                --iree-llvmcpu-target-abi=${RISCV_ABI}
+                "--iree-llvmcpu-target-cpu-features=${IREE_LLVM_FEATURES}"
+                --iree-consteval-jit-target-device=local-sync
+                -o ${TEST_VMFB}
+            DEPENDS ${TEST_MLIR_SOURCE}
+            COMMENT "Compiling shared ${TEST} VMFB"
+            VERBATIM
+        )
+
+        add_custom_command(
+            OUTPUT ${TEST_C_HEADER}
+            COMMAND ${XXD_TOOL} -i -n iree_model_vmfb ${TEST_VMFB} ${TEST_C_HEADER}
+            DEPENDS ${TEST_VMFB}
+            COMMENT "Generating shared IREE C array for ${TEST}"
+            VERBATIM
+        )
+        add_custom_target(${TEST}_IREE_vmfb DEPENDS ${TEST_C_HEADER})
+    endif()
+endmacro()
+
 macro(add_Benchmark_IREE_Verilator TEST SOURCE_DIR TEST_BUILD_DIR)
     # Check if verilator model is built
     if(NOT EXISTS "${VERILATOR_MODEL_DIR}/build/verilated_model")
@@ -303,82 +382,16 @@ macro(add_Benchmark_IREE_Verilator TEST SOURCE_DIR TEST_BUILD_DIR)
     endif()
 
     set(TEST_NAME ${TEST}_IREE_Verilator)
-    set(TEST_MLIR_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_model.mlir)
-    set(TEST_VMFB ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.vmfb)
-    set(TEST_C_HEADER ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.c)
-    set(PREGENERATED_MLIR ${SOURCE_DIR}/iree/${TEST}_model.mlir)
-
-    if(NOT EXISTS "${PREGENERATED_MLIR}")
-        message(FATAL_ERROR "MLIR model not found at ${PREGENERATED_MLIR}!")
-    endif()
-
-    message(STATUS "Found MLIR model at ${PREGENERATED_MLIR}, copying to build directory.")
-    
-    add_custom_command(
-        OUTPUT ${TEST_MLIR_SOURCE}
-        COMMAND ${CMAKE_COMMAND} -E copy ${PREGENERATED_MLIR} ${TEST_MLIR_SOURCE}
-        DEPENDS ${PREGENERATED_MLIR}
-        COMMENT "Copying MLIR model to build directory"
-        VERBATIM
-    )
-
-    find_program(IREE_COMPILE_TOOL iree-compile HINTS ${IREE_HOST_BIN_DIR} REQUIRED)
-    find_program(XXD_TOOL xxd REQUIRED)
-
-    # Compile MLIR to VMFB
-    string(REGEX MATCH "m" HAS_M ${RISCV_ARCH})
-    string(REGEX MATCH "f" HAS_F ${RISCV_ARCH})
-    string(REGEX MATCH "zve32x" HAS_ZVE32X ${RISCV_ARCH})
-    string(REGEX MATCH "zve32f" HAS_ZVE32F ${RISCV_ARCH})
-
-    set(IREE_LLVM_FEATURES "")
-    if(HAS_M)
-        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+m")
-    endif()
-    if(HAS_F)
-        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+f")
-    endif()
-    if(HAS_ZVE32X)
-        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+zve32x")
-    endif()
-    if(HAS_ZVE32F)
-        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+zve32f")
-    endif()
-    if(HAS_ZVE32X OR HAS_ZVE32F)
-        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+zvl${VREG_W}b")
-    endif()
-
-    string(REGEX REPLACE "^," "" IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES}")
-
-    add_custom_command(
-        OUTPUT ${TEST_VMFB}
-        COMMAND ${IREE_COMPILE_TOOL}
-            ${TEST_MLIR_SOURCE}
-            --iree-hal-target-device=local
-            --iree-hal-local-target-device-backends=llvm-cpu
-            --iree-llvmcpu-target-triple=riscv32-unknown-elf
-            --iree-llvmcpu-target-abi=${RISCV_ABI}
-            "--iree-llvmcpu-target-cpu-features=${IREE_LLVM_FEATURES}"
-            --iree-consteval-jit-target-device=local-sync
-            -o ${TEST_VMFB}
-        DEPENDS ${TEST_MLIR_SOURCE}
-        COMMENT "Compiling ${TEST}_model.mlir -> ${TEST}_model.vmfb"
-        VERBATIM
-    )
-
-    add_custom_command(
-        OUTPUT ${TEST_C_HEADER}
-        COMMAND ${XXD_TOOL} -i -n iree_model_vmfb ${TEST_VMFB} ${TEST_C_HEADER}
-        DEPENDS ${TEST_VMFB}
-        COMMENT "Generating ${TEST_NAME}.c from ${TEST_NAME}.vmfb"
-        VERBATIM
-    )
+    add_Benchmark_IREE_VMFB(${TEST} ${SOURCE_DIR})
+    set(TEST_VMFB ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_IREE_shared.vmfb)
+    set(TEST_C_HEADER ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_IREE_shared.c)
 
     add_executable(${TEST_NAME})
+    add_dependencies(${TEST_NAME} ${TEST}_IREE_vmfb)
 
     target_include_directories(${TEST_NAME} PRIVATE
-        ${SOURCE_DIR}
         ${SOURCE_DIR}/iree
+        ${SOURCE_DIR}
         ${SOURCE_DIR}/${TEST}_data
         ${FRAMEWORK_TOP}/
         ${CMAKE_CURRENT_BINARY_DIR}
@@ -424,7 +437,7 @@ macro(add_Benchmark_IREE_Verilator TEST SOURCE_DIR TEST_BUILD_DIR)
     # Link IREE runtime and sim libraries
     target_link_libraries(${TEST_NAME} PRIVATE 
         bsp_Vicuna 
-        UART_Vicuna 
+        UART_Vicuna
         sim_Verilator
         -Wl,--start-group
         iree_runtime_unified
@@ -481,95 +494,16 @@ macro(add_Benchmark_IREE_Spike TEST SOURCE_DIR TEST_BUILD_DIR)
     build_spike()
 
     set(TEST_NAME ${TEST}_IREE_Spike)
-    
-    set(PREGENERATED_MLIR "${SOURCE_DIR}/iree/${TEST}_model.mlir")
-    set(TEST_MLIR_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_model.mlir)
-    set(TEST_VMFB ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_model.vmfb)
-    set(TEST_C_HEADER ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_model.c)
-
-    if(NOT EXISTS "${PREGENERATED_MLIR}")
-        message(FATAL_ERROR "MLIR model not found at ${PREGENERATED_MLIR}!\n"
-                            "Please extract the .tflite from model_data.cc and convert it to MLIR via TOSA converter.\n"
-                            "Example workflow:\n"
-                            "  1. python3 CMake/extract_tflite.py ${SOURCE_DIR}/${TEST}_data/${TEST}_model_data.cc ${TEST}_model.tflite\n"
-                            "  2. tosa-converter-for-tflite ${TEST}_model.tflite --text -o ${TEST}_model.mlir\n"
-                            "  3. mv ${TEST}_model.mlir ${SOURCE_DIR}/iree/")
-    endif()
-
-    message(STATUS "Found MLIR model at ${PREGENERATED_MLIR}, copying to build directory.")
-    
-    # Copy the MLIR to the build directory so the pipeline can continue smoothly
-    add_custom_command(
-        OUTPUT ${TEST_MLIR_SOURCE}
-        COMMAND ${CMAKE_COMMAND} -E copy ${PREGENERATED_MLIR} ${TEST_MLIR_SOURCE}
-        DEPENDS ${PREGENERATED_MLIR}
-        COMMENT "Copying MLIR model to build directory"
-        VERBATIM
-    )
-
-    # Locate IREE compiler
-    find_program(IREE_COMPILE_TOOL iree-compile HINTS ${IREE_HOST_BIN_DIR} REQUIRED)
-    find_program(XXD_TOOL xxd REQUIRED)
-
-    # 3. Compile MLIR to VMFB
-    string(REGEX MATCH "m" HAS_M ${RISCV_ARCH})
-    string(REGEX MATCH "f" HAS_F ${RISCV_ARCH})
-    string(REGEX MATCH "zve32x" HAS_ZVE32X ${RISCV_ARCH})
-    string(REGEX MATCH "zve32f" HAS_ZVE32F ${RISCV_ARCH})
-
-    # Generate IREE LLVM features based on RISCV_ARCH
-    set(IREE_LLVM_FEATURES "")
-
-    if(HAS_M)
-        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+m")
-    endif()
-    if(HAS_F)
-        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+f")
-    endif()
-    if(HAS_ZVE32X)
-        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+zve32x")
-    endif()
-    if(HAS_ZVE32F)
-        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+zve32f")
-    endif()
-
-    if(HAS_ZVE32X OR HAS_ZVE32F)
-        set(IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES},+zvl${VREG_W}b")
-    endif()
-
-    string(REGEX REPLACE "^," "" IREE_LLVM_FEATURES "${IREE_LLVM_FEATURES}")
-
-    # 2. Compile MLIR to VMFB
-    add_custom_command(
-        OUTPUT ${TEST_VMFB}
-        COMMAND ${IREE_COMPILE_TOOL}
-            ${TEST_MLIR_SOURCE}
-            --iree-hal-target-device=local
-            --iree-hal-local-target-device-backends=llvm-cpu
-            --iree-llvmcpu-target-triple=riscv32-unknown-elf
-            --iree-llvmcpu-target-abi=${RISCV_ABI}
-            --iree-llvmcpu-target-cpu-features=${IREE_LLVM_FEATURES}
-            --iree-consteval-jit-target-device=local-sync
-            -o ${TEST_VMFB}
-        DEPENDS ${TEST_MLIR_SOURCE}
-        COMMENT "Compiling ${TEST}_model.mlir -> ${TEST}_model.vmfb"
-        VERBATIM
-    )
-
-    # 4. Generate C array from VMFB
-    add_custom_command(
-        OUTPUT ${TEST_C_HEADER}
-        COMMAND ${XXD_TOOL} -i -n iree_model_vmfb ${TEST_VMFB} ${TEST_C_HEADER}
-        DEPENDS ${TEST_VMFB}
-        COMMENT "Generating ${TEST}_model.c from ${TEST}_model.vmfb"
-        VERBATIM
-    )
+    add_Benchmark_IREE_VMFB(${TEST} ${SOURCE_DIR})
+    set(TEST_VMFB ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_IREE_shared.vmfb)
+    set(TEST_C_HEADER ${CMAKE_CURRENT_BINARY_DIR}/${TEST}_IREE_shared.c)
 
     add_executable(${TEST_NAME})
+    add_dependencies(${TEST_NAME} ${TEST}_IREE_vmfb)
 
     target_include_directories(${TEST_NAME} PRIVATE
-        ${SOURCE_DIR}
         ${SOURCE_DIR}/iree
+        ${SOURCE_DIR}
         ${SOURCE_DIR}/${TEST}_data
         ${FRAMEWORK_TOP}/
         ${CMAKE_CURRENT_BINARY_DIR}
