@@ -108,6 +108,7 @@ class Benchmark
     iree_runtime_session_t* session = nullptr;
     iree_runtime_call_t call = {0};
     bool call_initialized = false;
+    int init_error = 0;
     iree_allocator_t allocator;
 
     public:
@@ -119,39 +120,44 @@ class Benchmark
         iree_runtime_instance_options_use_all_available_drivers(&instance_options);
 
         iree_status_t status = iree_runtime_instance_create(&instance_options, allocator, &instance);
-        if (!iree_status_is_ok(status)) return;
+        if (!iree_status_is_ok(status)) { init_error = 100; return; }
 
         iree_hal_device_t* device = nullptr;
         status = iree_runtime_instance_try_create_default_device(
             instance, iree_make_cstring_view("local-sync"), &device);
-        if (!iree_status_is_ok(status)) return;
+        if (!iree_status_is_ok(status)) { init_error = 101; return; }
 
         iree_runtime_session_options_t session_options;
         iree_runtime_session_options_initialize(&session_options);
         status = iree_runtime_session_create_with_device(
             instance, &session_options, device, allocator, &session);
         iree_hal_device_release(device);
-        if (!iree_status_is_ok(status)) return;
+        if (!iree_status_is_ok(status)) { init_error = 102; return; }
 
         iree_vm_module_t* module = nullptr;
         status = iree_vm_bytecode_module_create(
             iree_runtime_instance_vm_instance(instance), IREE_VM_BYTECODE_MODULE_FLAG_NONE,
-            iree_make_const_byte_span(TEST_VMFB_DATA, TEST_VMFB_DATA_LEN),
+            iree_make_const_byte_span((const uint8_t*)TEST_VMFB_DATA, TEST_VMFB_DATA_LEN),
             iree_allocator_null(), allocator, &module);
-        if (!iree_status_is_ok(status)) return;
+        if (!iree_status_is_ok(status)) { init_error = 103; return; }
 
         status = iree_runtime_session_append_module(session, module);
         iree_vm_module_release(module);
-        if (!iree_status_is_ok(status)) return;
+        if (!iree_status_is_ok(status)) { 
+            init_error = 200 + iree_status_code(status); 
+            return; 
+        }
 
         status = iree_runtime_call_initialize_by_name(
             session, iree_make_cstring_view(TEST_FUNCTION_NAME), &call);
-        if (!iree_status_is_ok(status)) return;
+        if (!iree_status_is_ok(status)) { init_error = 105; return; }
         call_initialized = true;
     }
 
     inline int run_benchmark() {
-        if (!instance || !session || !call_initialized) return 1;
+        if (!instance || !session || !call_initialized) {
+            return init_error ? init_error : 1;
+        }
 
         iree_hal_allocator_t* device_allocator = iree_runtime_session_device_allocator(session);
 

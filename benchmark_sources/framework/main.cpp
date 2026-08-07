@@ -17,10 +17,10 @@ int main()
     int code = benchmark.run_benchmark();
     simulator.end_measurement();
     if (code != 0) {
+        simulator.terminate(code);
         return code;
     }
     code = benchmark.validate_benchmark();
     simulator.terminate(code);
     return code;
-
 } 

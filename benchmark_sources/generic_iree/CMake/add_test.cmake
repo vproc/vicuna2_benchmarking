@@ -120,7 +120,7 @@ macro(add_IreeBenchmark_Spike TEST_NAME TEST_DIR)
     )
 
     if(COMMIT_LOG) 
-        set(SPIKE_COMMIT_LOG_ARGS "--log-commits" "--log=${TEST_BUILD_DIR}/${TEST_NAME}_commit_log.txt")
+        set(SPIKE_COMMIT_LOG_ARGS "--log-commits" "--log=${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_commit_log.txt")
     else()
         set(SPIKE_COMMIT_LOG_ARGS "")
     endif()
@@ -274,7 +274,7 @@ macro(add_IreeBenchmark_Verilator TEST_NAME TEST_DIR)
 
     if(TRACE)
         set(VCD_TRACE_FLAG "--trace")
-        set(VCD_TRACE_ARG "${TEST_BUILD_DIR}/test_${TEST_NAME}_Verilator_sig.vcd")
+        set(VCD_TRACE_ARG "${CMAKE_CURRENT_BINARY_DIR}/test_${TEST_NAME}_Verilator_sig.vcd")
     else()
         set(VCD_TRACE_FLAG "")
         set(VCD_TRACE_ARG "")
@@ -282,7 +282,7 @@ macro(add_IreeBenchmark_Verilator TEST_NAME TEST_DIR)
 
      if(COMMIT_LOG)
         set(COMMIT_FLAG "--commit")
-        set(COMMIT_ARG "${TEST_BUILD_DIR}/")
+        set(COMMIT_ARG "${CMAKE_CURRENT_BINARY_DIR}/")
     else()
         set(COMMIT_FLAG "")
         set(COMMIT_ARG "")
@@ -290,7 +290,7 @@ macro(add_IreeBenchmark_Verilator TEST_NAME TEST_DIR)
 
     add_test(
         NAME ${TEST_TARGET}
-        COMMAND ./${VERILATOR_MODEL_DIR}/build/verilated_model ${CMAKE_CURRENT_BINARY_DIR}/prog_${TEST_TARGET}.txt ${MEM_PORTS} ${MEM_W} 4194304 ${MEM_LATENCY} 1 toycar ${VREG_W} 0 ${VCD_TRACE_FLAG} ${VCD_TRACE_ARG} ${COMMIT_FLAG} ${COMMIT_ARG}
+        COMMAND ./${VERILATOR_MODEL_DIR}/build/verilated_model ${CMAKE_CURRENT_BINARY_DIR}/prog_${TEST_TARGET}.txt ${MEM_PORTS} ${MEM_W} 8388608 ${MEM_LATENCY} 1 toycar ${VREG_W} 0 ${VCD_TRACE_FLAG} ${VCD_TRACE_ARG} ${COMMIT_FLAG} ${COMMIT_ARG}
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../..
     )
 

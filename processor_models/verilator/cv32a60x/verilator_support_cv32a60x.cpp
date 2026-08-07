@@ -4,7 +4,7 @@
 // In general, accesses to internal variables (exposed with VERILATOR_PUBLIC) should be handled here by passing in a reference to TOP.  Accesses to top level interface signals (i.e. memory interfaces) should be handled by the user.
 #include "verilator_support_cv32a60x.h"
 /*
-* Functions and Variables used to detect a stall.  Returns true if PC_ID_EX in CV32A60X core has not changed in the provided number of cycles
+* Functions and Variables used to detect a stall.  Returns true if IF_PC has not changed in the provided number of cycles
 * ARGS:
 *   - *top          - pointer to verilator top module
 *   -  max_cycles   - number of cycles after which a stall is declared
@@ -110,7 +110,7 @@ void update_mem_load(Vvproc_top *top, uint32_t address, bool req_valid, bool req
         queue_meta[0][1]   = req_src;
         queue_meta[0][2]   = 0;
     } else if (req_valid){
-            fprintf(stderr, "ERROR: READ ATTEMPTED OUTSIDE OF VALID ADDRESS SPACE\n");
+            fprintf(stderr, "ERROR: READ ATTEMPTED OUTSIDE OF VALID ADDRESS SPACE: 0x%08x\n", address);
     }
 
 
@@ -146,7 +146,7 @@ void update_mem_write(Vvproc_top *top, uint32_t address, bool req_valid, bool re
         } 
         else
         {
-            fprintf(stderr, "ERROR: WRITE ATTEMPTED OUTSIDE OF VALID ADDRESS SPACE\n");
+            fprintf(stderr, "ERROR: WRITE ATTEMPTED OUTSIDE OF VALID ADDRESS SPACE: 0x%08x\n", address);
         }
         //queue_valid[mem_lat-1] = true; //need to signal valid on store interface for accepted transaction.  Can always respond in 1 cycle due to store buffer - TODO: signal over mem_w_valid_i, but needs to be delayed 1 cycle
         // if (!req_src) //only scalar interface uses mem_w_valid, vector uses mem_r_valid even for stores TODO: Refactor this (separate interfaces completely?)

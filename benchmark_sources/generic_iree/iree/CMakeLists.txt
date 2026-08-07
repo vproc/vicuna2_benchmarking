@@ -45,8 +45,8 @@ add_compile_definitions(
 )
 
 # Suppress warnings stemmed from IREE source code
-string(APPEND CMAKE_C_FLAGS " -Wno-type-limits -Wno-unused-parameter -Wno-missing-field-initializers -Wno-ignored-qualifiers -Wno-cast-function-type")
-string(APPEND CMAKE_CXX_FLAGS " -Wno-type-limits -Wno-unused-parameter -Wno-missing-field-initializers -Wno-ignored-qualifiers -Wno-cast-function-type")
+string(APPEND CMAKE_C_FLAGS " -mstrict-align -fno-builtin-memcpy -Wno-type-limits -Wno-unused-parameter -Wno-missing-field-initializers -Wno-ignored-qualifiers -Wno-cast-function-type")
+string(APPEND CMAKE_CXX_FLAGS " -mstrict-align -fno-builtin-memcpy -Wno-type-limits -Wno-unused-parameter -Wno-missing-field-initializers -Wno-ignored-qualifiers -Wno-cast-function-type")
 
 # Remove -Werror to allow warnings
 string(REPLACE " -Werror" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
