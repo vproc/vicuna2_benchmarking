@@ -240,6 +240,7 @@ int main(int argc, char **argv) {
 
     top->clk_i = 1;
     top->eval();
+    update_cycles();
     update_stats(top);
     update_vcd(tfp, cycles_begin_trace, cycles_end_trace);
 

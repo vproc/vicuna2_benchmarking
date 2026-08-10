@@ -18,6 +18,7 @@ auto inst_trace = false;
 auto inst_trace_file = std::ofstream{};
 
 uint64_t cycles = 0;
+uint64_t trace_timesteps = 0;
 uint32_t current_WB_PC = 0;
 uint32_t last_WB_PC = 0;
 uint32_t instr = 0;
@@ -301,8 +302,8 @@ void dump_mem_region(uint32_t start_addr, uint32_t end_addr, unsigned char *mem,
 /*
  *   Cycle count update
  */
-void update_cycles() {
-  cycles++;
+void update_trace_timesteps() {
+  trace_timesteps++;
   return;
 }
 
@@ -316,7 +317,7 @@ void update_instructions(Vvproc_top *top) {
   if (current_WB_PC != last_WB_PC) {
     instr++;
     if (inst_trace) {
-      print_trace(current_WB_PC, instr, cycles);
+      print_trace();
     }
   }
   last_WB_PC = current_WB_PC;
@@ -419,7 +420,7 @@ void update_avg_vector_len(Vvproc_top *top) {
  *   - *top          - pointer to verilator top module
  */
 void update_stats(Vvproc_top *top) {
-  update_cycles();
+  update_trace_timesteps();
   update_instructions(top);
   update_vector_count(top);
   update_avg_vector_len(top);
@@ -454,10 +455,10 @@ void report_stats() {
 void update_vcd(VerilatedTrace_t *tfp, uint32_t begin_cycles,
                 uint32_t end_cycles) {
   if (tfp != NULL) {
-    if ((cycles >= begin_cycles) && (cycles < end_cycles) ||
+    if ((trace_timesteps >= begin_cycles) && (trace_timesteps < end_cycles) ||
         (end_cycles == 0)) {
 #ifdef TRACE_VCD
-      tfp->dump(cycles);
+      tfp->dump(trace_timesteps);
 #endif
     }
   }
@@ -559,6 +560,11 @@ void update_vreg_commit(Vvproc_top *top, int vreg_w, FILE *commit_log) {
 }
 
 /**
+ * @brief Update the cycle count
+ */
+auto update_cycles() -> void { cycles++; }
+
+/**
  * @brief Enable instruction tracing
  * @param path - The path to the output file
  */
@@ -574,12 +580,12 @@ auto enable_inst_trace(char const *path) -> void {
  * @param instruction
  * @param cycle
  */
-auto print_trace(uint64_t pc, uint32_t instruction, uint64_t cycle) -> void {
+auto print_trace() -> void {
   static uint64_t last_cycle = 0;
-  inst_trace_file << std::hex << std::setw(8) << std::setfill('0') << pc
-                  << ", ";
-  inst_trace_file << std::setw(8) << std::setfill('0') << instruction;
-  inst_trace_file << ", " << std::dec << cycle << ", " << cycle - last_cycle
+  inst_trace_file << std::hex << std::setw(8) << std::setfill('0')
+                  << current_WB_PC << ", ";
+  inst_trace_file << std::setw(8) << std::setfill('0') << instr;
+  inst_trace_file << ", " << std::dec << cycles << ", " << cycles - last_cycle
                   << "\n";
-  last_cycle = cycle;
+  last_cycle = cycles;
 }

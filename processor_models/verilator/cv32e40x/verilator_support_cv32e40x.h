@@ -170,8 +170,10 @@ void dump_mem_region (uint32_t start_addr, uint32_t end_addr, unsigned char *mem
 */
 
 /*
-*   Cycle count update
+*   Trace timestep update
 */
+void update_trace_timesteps();
+
 void update_cycles();
 
 /*
@@ -253,7 +255,7 @@ void update_vreg_commit(Vvproc_top *top, int vreg_w, FILE *commit_log);
 
 auto enable_inst_trace(char const *path) -> void;
 
-auto print_trace(uint64_t pc, uint32_t instruction, uint64_t cycle) -> void;
+auto print_trace() -> void;
 
 
 #endif
