@@ -8,6 +8,7 @@
 // user.
 #include "verilator_support_cv32e40x.h"
 #include <cstdint>
+#include <cstdio>
 #include <fstream>
 #include <iomanip>
 

@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
     switch (opt) {
     case 'i':
       // Enable instruction tracing
-      std::fprintf(stderr, "Enable instruction tracing\n");
+      std::fprintf(stderr, "Enable instruction tracing to %s\n", optarg);
       enable_inst_trace(optarg);
       break;
     case 'c':

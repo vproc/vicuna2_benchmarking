@@ -1,0 +1,10 @@
+[Plugin PerformanceEstimatorPlugin]
+plugin.perfEst.uArch=Vicuna_zvl@VREG_W@b
+plugin.perfEst.print=1
+plugin.perfEst.printDir=@TARGET_TRACE_DIR@
+[Plugin TracePrinterPlugin]
+plugin.tracePrinter.trace=AssemblyTrace
+plugin.tracePrinter.stream.toFile=1
+plugin.tracePrinter.stream.outDir=@TARGET_TRACE_DIR@
+plugin.tracePrinter.stream.fileName=asm_trace
+plugin.tracePrinter.stream.rotateSize=0x10000

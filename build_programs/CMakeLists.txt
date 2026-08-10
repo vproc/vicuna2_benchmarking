@@ -18,16 +18,6 @@ message(STATUS "CMake Version ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}.${CM
 set(BENCHMARK_SUITE "NONE" CACHE STRING "Benchmark Suite to compile.  Name of the top level folder in /Benchmark_Sources")
 set(COMPILER "NONE" CACHE STRING "GCC or LLVM")
 
-
-#####
-# Default Paths to Subdirectories
-#####
-
-set(TOOLCHAIN_TOP ${CMAKE_CURRENT_SOURCE_DIR}/../toolchain) #Top level path to toolchain folder
-set(VERILATOR_MODEL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../processor_models/verilator) #Top level path to verilator model files
-set(GEM5_MODEL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../processor_models/gem5)#Top level path to gem5 model files
-set(BUILD_DIR   ${CMAKE_CURRENT_SOURCE_DIR}/build) #Top level path to program build folder
-
 #####
 # Enable/Disable different simulators.  All enabled by default
 #####
@@ -44,6 +34,8 @@ option(ETISS_SIM       "Enable ETISS simulation"                                
 
 option(TRACE        "Enable trace outputs"                                      OFF)
 option(COMMIT_LOG   "Enable register commit logs from Verilator + Spike"        OFF)
+set(INSTR_TRACE_DIR "NONE" CACHE STRING "Instruction trace directory for Verilator")
+set(ETISS_PERF_TRACE_DIR "NONE" CACHE STRING "Instruction/Perf trace directory for ETISS")
 
 #####
 # Select RISCV_ARCH and RISCV_ABI and Autovectorization flags based on selected features
@@ -63,6 +55,15 @@ set(MEM_PORTS ${VMEM_PORTS})
 message("Selected MEM_PORTS = ${MEM_PORTS}")
 
 set(MEM_LATENCY 1 CACHE STRING "Memory latency") #This should come from the vector config
+
+#####
+# Default Paths to Subdirectories
+#####
+
+set(TOOLCHAIN_TOP ${CMAKE_CURRENT_SOURCE_DIR}/../toolchain) #Top level path to toolchain folder
+set(VERILATOR_MODEL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../processor_models/verilator) #Top level path to verilator model files
+set(GEM5_MODEL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../processor_models/gem5)#Top level path to gem5 model files
+set(BUILD_DIR   ${CMAKE_CURRENT_SOURCE_DIR}/build/${RISCV_ARCH}_zvl${VREG_W}b) #Top level path to program build folder
 
 #These control benchmark configurations specific to the selected RISCV_ARCH
 option(RISCV_F "Use the RISC-V F Extension" OFF)

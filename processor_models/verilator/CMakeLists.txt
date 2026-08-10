@@ -20,6 +20,7 @@ project(Verilated-Builds LANGUAGES C CXX DESCRIPTION "Environment for Verilating
 
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Using C and C++ 11
 set(CMAKE_C_STANDARD 14)
