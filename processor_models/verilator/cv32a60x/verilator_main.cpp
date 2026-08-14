@@ -256,6 +256,8 @@ int main(int argc, char **argv) {
     bool dmem_req_limit = true;
 
     int num_outstanding_imem = 0;
+    int num_outstanding_vmem = 0;
+    int num_outstanding_dmem = 0;
 
     int num_read_req = 0;
 
@@ -346,6 +348,8 @@ int main(int argc, char **argv) {
             vec_mem_meta_queue[p][0][2]   = false;
         }
 
+        // top->mem_gnt_i = !dmem_busy & top->mem_req_o;
+        // top->mem_ignt_i = !imem_busy & top->mem_ireq_o;
         top->mem_gnt_i = !dmem_busy & top->mem_req_o;
         top->mem_ignt_i = !imem_busy & top->mem_ireq_o;
 
@@ -357,8 +361,8 @@ int main(int argc, char **argv) {
         update_mem_write(top, (top->mem_addr_o & 0xFFFFFFFC), (top->mem_req_o && top->mem_we_o && top->mem_gnt_i), (top->mem_src_o), mem_w, mem_latency, mem_sz, (unsigned char*)&(top->mem_wdata_o), (unsigned char*)&(top->mem_be_o), (bool*)&(top->mem_wvalid_i), mem_rvalid_queue, mem_meta_queue, mem);
         update_mem_load(top,  (top->mem_addr_o & 0xFFFFFFFC), (top->mem_req_o && !top->mem_we_o && top->mem_gnt_i), top->mem_we_o, (top->mem_src_o), mem_w, mem_latency, mem_sz, (unsigned char*)&(top->mem_rdata_i), (bool*)&(top->mem_rvalid_i), (bool*)&(top->mem_err_i), (bool*)&(top->mem_src_i), mem_rdata_queue, mem_rvalid_queue, mem_meta_queue, mem);
         for(int p = 0; p < mem_ports; p++){
-            update_mem_write(top, (top->vec_mem_addr_o[p] & 0xFFFFFFFC), (top->vec_mem_req_o[p] && top->vec_mem_we_o[p] && top->vec_mem_gnt_i[p]), (top->vec_mem_src_o), mem_w, mem_latency, mem_sz, (unsigned char*)&(top->vec_mem_wdata_o[p]), (unsigned char*)&(top->vec_mem_be_o[p]), (bool*)&(top->vec_mem_wvalid_i[p]), vec_mem_rvalid_queue[p], vec_mem_meta_queue[p], mem);
-            update_mem_load(top,  (top->vec_mem_addr_o[p] & 0xFFFFFFFC), (top->vec_mem_req_o[p] && !top->vec_mem_we_o[p] && top->vec_mem_gnt_i[p]), top->vec_mem_we_o[p], (top->vec_mem_src_o), mem_w, mem_latency, mem_sz, (unsigned char*)&(top->vec_mem_rdata_i[p]), (bool*)&(top->vec_mem_rvalid_i[p]), (bool*)&(top->vec_mem_err_i[p]), (bool*)&(top->vec_mem_src_i), vec_mem_rdata_queue[p], vec_mem_rvalid_queue[p], vec_mem_meta_queue[p], mem);
+            update_mem_write(top, (top->vec_mem_addr_o[p]), (top->vec_mem_req_o[p] && top->vec_mem_we_o[p] && top->vec_mem_gnt_i[p]), (top->vec_mem_src_o), mem_w, mem_latency, mem_sz, (unsigned char*)&(top->vec_mem_wdata_o[p]), (unsigned char*)&(top->vec_mem_be_o[p]), (bool*)&(top->vec_mem_wvalid_i[p]), vec_mem_rvalid_queue[p], vec_mem_meta_queue[p], mem);
+            update_mem_load(top,  (top->vec_mem_addr_o[p]), (top->vec_mem_req_o[p] && !top->vec_mem_we_o[p] && top->vec_mem_gnt_i[p]), top->vec_mem_we_o[p], (top->vec_mem_src_o), mem_w, mem_latency, mem_sz, (unsigned char*)&(top->vec_mem_rdata_i[p]), (bool*)&(top->vec_mem_rvalid_i[p]), (bool*)&(top->vec_mem_err_i[p]), (bool*)&(top->vec_mem_src_i), vec_mem_rdata_queue[p], vec_mem_rvalid_queue[p], vec_mem_meta_queue[p], mem);
         }
 
         //Update instruction memory interface.  Never a write here.  Metadata field repurposed to store obi.id field, used internally for the index in the fetchbuffer.
@@ -393,29 +397,40 @@ int main(int argc, char **argv) {
         top->eval();
 
 
-        //Currently only one outstanding DMEM request allowed
+        //Currently only two outstanding DMEM requests allowed
         if (top->mem_req_o && top->mem_gnt_i)
         {
-            dmem_busy = true;
+            num_outstanding_dmem++;
+                if (num_outstanding_dmem == 2)
+                {
+                    dmem_busy = true;
+                }
         }
         if (top->mem_rvalid_i || top->mem_wvalid_i) {
             dmem_busy = false;
+            num_outstanding_dmem--;
+
         }
-         //Currently only one outstanding VMEM request allowed per port
+         //Currently only two outstanding VMEM requests allowed per port
         for(int p = 0; p < mem_ports; p++){
             if (top->vec_mem_req_o[p] && top->vec_mem_gnt_i[p])
             {
-                vmem_busy[p] = true;
+                num_outstanding_vmem++;
+                if (num_outstanding_vmem == 2)
+                {
+                    vmem_busy[p] = true;
+                }
             }
             if (top->vec_mem_rvalid_i[p]) {
                 vmem_busy[p] = false;
+                num_outstanding_vmem--;
             }
         }
-        //Currently only 1 outstanding IMEM requests allowed
+        //Currently only 2 outstanding IMEM requests allowed
         if (top->mem_ireq_o && top->mem_ignt_i)
         {
             num_outstanding_imem++;
-            if (num_outstanding_imem == 1)
+            if (num_outstanding_imem == 2)
             {
                 imem_busy = true; //only two outstanding request allowed
             }
