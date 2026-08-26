@@ -46,10 +46,10 @@ macro(add_Benchmark_Verilator TEST)
         COMMAND ${CMAKE_OBJCOPY} -O binary ${TEST_NAME}.elf ${TEST_NAME}.bin
         COMMAND srec_cat ${TEST_NAME}.bin -binary -offset 0x0000 -byte-swap 4 -o ${TEST_NAME}.vmem -vmem
         COMMAND rm -f prog_${TEST_NAME}.txt
-        COMMAND echo -n "${BINARY_DIR}/${TEST_NAME}.vmem ${BINARY_DIR}/${TEST_NAME}_unused.txt " > prog_${TEST_NAME}.txt
+        COMMAND echo -n "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.vmem ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_unused.txt " > prog_${TEST_NAME}.txt
         COMMAND readelf -s ${TEST_NAME}.elf | sed '2,13 s/ //1' | grep vref_start | cut -d " " -f 6 | tr [=["\n"]=] " " >> prog_${TEST_NAME}.txt
         COMMAND readelf -s ${TEST_NAME}.elf | sed '2,13 s/ //1' | grep vref_end | cut -d " " -f 6 | tr [=["\n"]=] " " >> prog_${TEST_NAME}.txt
-        COMMAND echo -n "${BINARY_DIR}/${TEST_NAME}_vicuna_sim_out.txt " >> prog_${TEST_NAME}.txt
+        COMMAND echo -n "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_vicuna_sim_out.txt " >> prog_${TEST_NAME}.txt
         COMMAND readelf -s ${TEST_NAME}.elf | sed '2,13 s/ //1' | grep vdata_start | cut -d " " -f 6 | tr [=["\n"]=] " " >> prog_${TEST_NAME}.txt
         COMMAND readelf -s ${TEST_NAME}.elf | sed '2,13 s/ //1' | grep vdata_end | cut -d " " -f 6 | tr [=["\n"]=] " " >> prog_${TEST_NAME}.txt
         COMMAND ${CMAKE_OBJDUMP} -D ${TEST_NAME}.elf > ${TEST_NAME}_dump.txt
@@ -73,7 +73,7 @@ macro(add_Benchmark_Verilator TEST)
 
     #Add Test
     add_test(NAME ${TEST_NAME}
-        COMMAND ./${VERILATOR_MODEL_DIR}/build/verilated_model ${BUILD_DIR}/benchmark_sources/embench_iot/prog_${TEST_NAME}.txt ${MEM_PORTS} ${MEM_W} 4194304 ${MEM_LATENCY} 1 ${TEST_NAME} ${VREG_W} 0 ${VCD_TRACE_FLAG} ${VCD_TRACE_ARG} ${COMMIT_FLAG} ${COMMIT_ARG} #TODO: PASS ALL THESE ARGUMENTS IN FROM USER
+        COMMAND ./${VERILATOR_MODEL_DIR}/build/verilated_model ${CMAKE_CURRENT_BINARY_DIR}/prog_${TEST_NAME}.txt ${MEM_PORTS} ${MEM_W} 4194304 ${MEM_LATENCY} 1 ${TEST_NAME} ${VREG_W} 0 ${VCD_TRACE_FLAG} ${VCD_TRACE_ARG} ${COMMIT_FLAG} ${COMMIT_ARG} #TODO: PASS ALL THESE ARGUMENTS IN FROM USER
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../..)
 
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 1000) #TODO: Find a reasonable timeout for these tests
@@ -240,7 +240,7 @@ macro(add_Benchmark_Spike TEST)
 
     #Add Test
     add_test(NAME ${TEST_NAME}
-        COMMAND ${TOOLCHAIN_TOP}/spike/bin/spike --isa=rv32imf_zicntr_zihpm_zfh_zve32f_zvfh_zvl${VREG_W}b ${SPIKE_COMMIT_LOG_ARGS} --log=${BINARY_DIR}/${TEST_NAME}_commit_log.txt ${BINARY_DIR}/${TEST_NAME}.elf
+        COMMAND ${TOOLCHAIN_TOP}/spike/bin/spike --isa=rv32imf_zicntr_zihpm_zfh_zve32f_zvfh_zvl${VREG_W}b ${SPIKE_COMMIT_LOG_ARGS} --log=${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_commit_log.txt ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.elf
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../..)
 
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 5) #TODO: Find a reasonable timeout for these tests
@@ -280,7 +280,7 @@ macro(add_Benchmark_Etiss TEST)
     target_link_options(${TEST_NAME} PRIVATE
         "-L${ETISS_CRT_LIB}"
         "--specs=${ETISS_CRT_TOP}/etiss-semihost.specs"
-        "-T${ETISS_CRT_TOP}/etiss.ld"
+        "-T${ETISS_LINKER}"
         "-nostartfiles"
     )
 

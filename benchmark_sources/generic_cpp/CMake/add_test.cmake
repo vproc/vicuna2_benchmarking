@@ -35,14 +35,14 @@ macro(add_benchmark_Verilator TEST TEST_NUM)
                        COMMAND ${CMAKE_OBJCOPY} -O binary ${TEST_NAME}_Verilator.elf ${TEST_NAME}_Verilator.bin
                        COMMAND srec_cat ${TEST_NAME}_Verilator.bin -binary -offset 0x0000 -byte-swap 4 -o ${TEST_NAME}_Verilator.vmem -vmem
                        COMMAND rm -f prog_${TEST_NAME}_Verilator.txt
-                       COMMAND echo -n "${TEST_BUILD_DIR}/${TEST_NAME}_Verilator.vmem" > prog_${TEST_NAME}_Verilator.txt
+                       COMMAND echo -n "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_Verilator.vmem" > prog_${TEST_NAME}_Verilator.txt
                        COMMAND ${CMAKE_OBJDUMP} -D ${TEST_NAME}_Verilator.elf > ${TEST_NAME}_Verilator_dump.txt
                        )
     
     #VERY DANGEROUS TO USE TRACE
     if(TRACE)
         set(VCD_TRACE_FLAG "--trace")
-        set(VCD_TRACE_ARG "${TEST_BUILD_DIR}/test_${TEST_NAME}_Verilator_sig.vcd")
+        set(VCD_TRACE_ARG "${CMAKE_CURRENT_BINARY_DIR}/test_${TEST_NAME}_Verilator_sig.vcd")
     else()
         set(VCD_TRACE_FLAG "")
         set(VCD_TRACE_ARG "")
@@ -50,7 +50,7 @@ macro(add_benchmark_Verilator TEST TEST_NUM)
 
      if(COMMIT_LOG)
         set(COMMIT_FLAG "--commit")
-        set(COMMIT_ARG "${TEST_BUILD_DIR}/")
+        set(COMMIT_ARG "${CMAKE_CURRENT_BINARY_DIR}/")
     else()
         set(COMMIT_FLAG "")
         set(COMMIT_ARG "")
@@ -58,7 +58,7 @@ macro(add_benchmark_Verilator TEST TEST_NUM)
 
     #Add Test
     add_test(NAME ${TEST_NAME}_Verilator 
-             COMMAND ./${VERILATOR_MODEL_DIR}/build/verilated_model ${TEST_BUILD_DIR}/prog_${TEST_NAME}_Verilator.txt ${MEM_PORTS} ${MEM_W} 4194304 ${MEM_LATENCY} 1 ${TEST_NAME}_Verilator ${VREG_W} 0 ${VCD_TRACE_FLAG} ${VCD_TRACE_ARG} ${COMMIT_FLAG} ${COMMIT_ARG}#TODO: PASS ALL THESE ARGUMENTS IN FROM USER
+             COMMAND ./${VERILATOR_MODEL_DIR}/build/verilated_model ${CMAKE_CURRENT_BINARY_DIR}/prog_${TEST_NAME}_Verilator.txt ${MEM_PORTS} ${MEM_W} 4194304 ${MEM_LATENCY} 1 ${TEST_NAME}_Verilator ${VREG_W} 0 ${VCD_TRACE_FLAG} ${VCD_TRACE_ARG} ${COMMIT_FLAG} ${COMMIT_ARG}#TODO: PASS ALL THESE ARGUMENTS IN FROM USER
              WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../..)
              
     set_tests_properties(${TEST_NAME}_Verilator PROPERTIES TIMEOUT 120) #TODO: Find a reasonable timeout for these tests
@@ -89,7 +89,7 @@ macro(add_benchmark_Gem5 TEST TEST_NUM CONFIG_SCRIPT)
                        )
     #Add Test # TODO: Current exit condition for gem5 is a segfault(from invalid uart write to be unified with other sim techniques) which reports test failed.  Improve exit conditions with gem5 API calls once generic testing structure is finished.
     add_test(NAME ${TEST_NAME} 
-             COMMAND ${GEM5_MODEL_DIR}/gem5/build/ALL/gem5.opt ${GEM5_MODEL_DIR}/configuration_scripts/${CONFIG_SCRIPT}.py ${VREG_W} ${TEST_BUILD_DIR}/${TEST_NAME}.elf
+             COMMAND ${GEM5_MODEL_DIR}/gem5/build/ALL/gem5.opt ${GEM5_MODEL_DIR}/configuration_scripts/${CONFIG_SCRIPT}.py ${VREG_W} ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.elf
              WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
              
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 0) #TODO: Find a reasonable timeout for these tests
@@ -133,7 +133,7 @@ macro(add_benchmark_Hybrid TEST TEST_NUM CONFIG_SCRIPT)
     # endif()
   #Add Test
         add_test(NAME ${TEST_NAME} 
-             COMMAND ${GEM5_MODEL_DIR}/gem5/build/ALL/gem5.opt ${GEM5_MODEL_DIR}/configuration_scripts/${CONFIG_SCRIPT}.py ${TEST_BUILD_DIR}/${TEST_NAME}.elf ${MEM_W}
+             COMMAND ${GEM5_MODEL_DIR}/gem5/build/ALL/gem5.opt ${GEM5_MODEL_DIR}/configuration_scripts/${CONFIG_SCRIPT}.py ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.elf ${MEM_W}
              WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 10) #TODO: Find a reasonable timeout for these tests
@@ -156,7 +156,7 @@ macro(add_benchmark_etiss TEST TEST_NUM)
     target_link_options(${TEST_NAME} PRIVATE 
         "-L${ETISS_CRT_LIB}"
         "--specs=${ETISS_CRT_TOP}/etiss-semihost.specs"
-        "-T${ETISS_CRT_TOP}/etiss.ld"
+        "-T${ETISS_LINKER}"
         "-nostartfiles"
     )
 
@@ -170,6 +170,6 @@ macro(add_benchmark_etiss TEST TEST_NUM)
         COMMAND 
             ${TOOLCHAIN_TOP}/etiss_base/etiss_rvv/build/installed/bin/bare_etiss_processor 
             -i${FRAMEWORK_TOP}/etiss/etiss.ini 
-            --vp.elf_file=${TEST_BUILD_DIR}/${TEST_NAME}.elf
+            --vp.elf_file=${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.elf
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endmacro()
