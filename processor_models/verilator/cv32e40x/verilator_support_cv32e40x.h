@@ -118,10 +118,14 @@ void update_mem_load(uint32_t address, bool req_valid, uint32_t mem_w, uint32_t 
 *   address        - address of the write request being issued
 *   req_valid      - validity of the write request being issued
 *   mem_w          - width of the write interface in bits
+*   mem_lat        - latency of the memory interface
 *   mem_size       - total size of the memory address space
 *
 *   *model_data_o  - pointer to memory data write interface on verilator model
 *   *model_be_o    - pointer to byte enable write interface on verilator model
+*
+*   *queue_valid   - pointer to valid queue
+*   *queue_err     - pointer to error queue
 *
 *   *mem           - pointer to memory space
 */

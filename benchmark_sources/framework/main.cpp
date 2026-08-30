@@ -14,10 +14,13 @@ int main()
 
     //Run benchmark
     simulator.begin_measurement();
-    benchmark.run_benchmark();
+    int code = benchmark.run_benchmark();
     simulator.end_measurement();
-    int code = benchmark.validate_benchmark();
+    if (code != 0) {
+        simulator.terminate(code);
+        return code;
+    }
+    code = benchmark.validate_benchmark();
     simulator.terminate(code);
     return code;
-
 } 

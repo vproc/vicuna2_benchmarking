@@ -1,21 +1,16 @@
 #ifndef BENCHMARK_HPP
-#define BENCHMARK_HPP 
+#define BENCHMARK_HPP
 
-#include <cstdint>
-//BSP includes
-//#include "uart.hpp"
-//Includes for benchmark
-#include "tensorflow/lite/micro/tflite_bridge/micro_error_reporter.h"
-#include "tensorflow/lite/micro/micro_interpreter.h"
+#include "toycar_int8_model_data.h"
+#include "toycar_int8_model_settings.h"
+#include "toycar_int8_input_data.h"
+#include "toycar_int8_output_data_ref.h"
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
+#include "tensorflow/lite/micro/micro_interpreter.h"
 #include "tensorflow/lite/schema/schema_generated.h"
-
-#include "toycar_int8_data/toycar_int8_input_data.h"
-#include "toycar_int8_data/toycar_int8_model_data.h"
-#include "toycar_int8_data/toycar_int8_model_settings.h"
-#include "toycar_int8_data/toycar_int8_output_data_ref.h"
-
-//Due to scoping/dynamic allocation issue with tflm, unfortunately need to include simulator specific  in this file
+#include "tensorflow/lite/c/common.h"
+#include "tensorflow/lite/micro/tflite_bridge/micro_error_reporter.h"
+//Include simulator specific  in this file
 #include "simulator.hpp"
 
 class Benchmark
@@ -61,7 +56,7 @@ class Benchmark
         {
             //uart_printf("Failed in Invoke!\n");
             return 2;
-        } 
+        }
         //End measurement for real
         simulator.end_measurement();
 
@@ -77,7 +72,7 @@ class Benchmark
         sum /= toycar_int8_input_data_len[0];
 
         int32_t diff = abs(sum - toycar_int8_output_data_ref[0]);
-        
+
         if (diff > 1)
         {
             //uart_printf("ERROR: at #%d, sum %d ref %d diff %d \n", 0, sum, toycar_int8_output_data_ref[0], diff);
@@ -103,4 +98,5 @@ class Benchmark
     ~Benchmark(){
     };
 };
-#endif
+
+#endif // BENCHMARK_HPP
