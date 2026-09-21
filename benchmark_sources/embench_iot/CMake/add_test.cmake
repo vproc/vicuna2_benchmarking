@@ -289,16 +289,38 @@ macro(add_Benchmark_Etiss TEST)
         POST_BUILD
         COMMAND ${CMAKE_OBJDUMP} -D ${TEST_NAME}.elf > ${TEST_NAME}_dump.txt
     )
+    set(INI_DIR ${FRAMEWORK_TOP}/etiss/ini)
+    if(${ETISS_PERF_TRACE_DIR} STREQUAL "NONE")
+        add_test(NAME ${TEST_NAME}
+            COMMAND
+            ${TOOLCHAIN_TOP}/etiss_base/etiss_rvv/build/bin/bare_etiss_processor
+            -i${FRAMEWORK_TOP}/etiss/etiss.ini
+            --vp.elf_file=${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.elf
+            --arch.cpu=RV32IMACFDV_zvl${VREG_W}b
+            WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+    else()
+        set(TEST_TRACE_DIR ${ETISS_PERF_TRACE_DIR}/${TEST_NAME})
+        add_custom_command(TARGET ${TEST_NAME}
+            POST_BUILD
+            COMMAND mkdir -p ${TEST_TRACE_DIR}
+        )
+        set(DYN_INI_IN ${INI_DIR}/dyn.ini.in)
+        set(DYN_INI ${INI_DIR}/dyn_ini/${TEST_NAME}_zvl${VREG_W}.ini)
+        configure_file(${DYN_INI_IN} ${DYN_INI} @ONLY)
+        add_test(NAME ${TEST_NAME}
+            COMMAND
+            ${TOOLCHAIN_TOP}/etiss_base/etiss_perfsim/etiss-perf-sim/etiss/build_dir/bin/bare_etiss_processor
+            -i${DYN_INI}
+            -i${INI_DIR}/etiss.ini
+            --vp.elf_file=${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.elf
+            --arch.cpu=RV32IMACFDV_zvl${VREG_W}b
+            WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+        # set_property(TEST ${TEST_NAME} APPEND PROPERTIY ENVIRONMENT VLEN=${VREG_W})
+        # set_property(TEST ${TEST_NAME} APPEND PROPERTIY ENVIRONMENT VLANE_WIDTH=32)
+        set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT "VLANE_WIDTH=32;VLEN=${VREG_W}")
+    endif()
 
-    message("PATH = ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.elf")
 
-    add_test(NAME ${TEST_NAME}
-        COMMAND
-        ${TOOLCHAIN_TOP}/etiss_base/etiss_rvv/build/bin/bare_etiss_processor
-        -i${FRAMEWORK_TOP}/etiss/etiss.ini
-        --vp.elf_file=${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.elf
-        --arch.cpu=RV32IMACFDV_zvl${VREG_W}b
-        WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
     # set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 5) #TODO: Find a reasonable timeout for these tests
 
