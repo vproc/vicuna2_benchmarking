@@ -9,6 +9,7 @@ toolchain/GCC/rv32im_zve32x/*
 toolchain/llvm/llvm_22_1_8/*
 toolchain/spike/*
 toolchain/etiss_base/etiss_rvv/*
+toolchain/iree_compiler/*
 
 #Simulator Specific Ignores
 

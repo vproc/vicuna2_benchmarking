@@ -1,0 +1,110 @@
+From 018d4dc08819723d040ccae87dc83dc94fd7e329 Mon Sep 17 00:00:00 2001
+From: Han-Kuan Chen <hankuan.chen@sifive.com>
+Date: Wed, 8 Apr 2026 04:42:20 -0700
+Subject: [PATCH 4/5] Fix generic RISC-V build: skip coordinated_test on
+ Generic CMake
+
+Commit 3a4c9919ba3a8e81b47fb10bbccc0b45be8e0fab added the coordinated
+multi-process test harness as part of the async / cross-process shared
+memory infrastructure. That implementation assumes a host OS with POSIX
+(or Windows) process and filesystem support and pulls in <dirent.h>,
+nanosleep, mkdtemp, etc.
+
+Fix this by teaching runtime/src/iree/testing/CMakeLists.txt to skip
+building coordinated_test, coordinated_test_main, and
+coordinated_test_test when CMAKE_SYSTEM_NAME is "Generic".
+
+Signed-off-by: Han-Kuan Chen <hankuan.chen@sifive.com>
+---
+ runtime/src/iree/testing/CMakeLists.txt | 76 +++++++++++++------------
+ 1 file changed, 39 insertions(+), 37 deletions(-)
+
+diff --git a/runtime/src/iree/testing/CMakeLists.txt b/runtime/src/iree/testing/CMakeLists.txt
+index 73634ad59f..2e247f8135 100644
+--- a/runtime/src/iree/testing/CMakeLists.txt
++++ b/runtime/src/iree/testing/CMakeLists.txt
+@@ -92,42 +92,44 @@ iree_cc_library(
+ 
+ ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+ 
+-iree_cc_library(
+-  NAME
+-    coordinated_test
+-  HDRS
+-    "coordinated_test.h"
+-  SRCS
+-    "coordinated_test.c"
+-  DEPS
+-    iree::base
+-  PUBLIC
+-)
++if(NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
++  iree_cc_library(
++    NAME
++      coordinated_test
++    HDRS
++      "coordinated_test.h"
++    SRCS
++      "coordinated_test.c"
++    DEPS
++      iree::base
++    PUBLIC
++  )
+ 
+-iree_cc_library(
+-  NAME
+-    coordinated_test_main
+-  SRCS
+-    "coordinated_test_main.cc"
+-  DEPS
+-    ::coordinated_test
+-    ::gtest
+-    gtest
+-    iree::base
+-    iree::base::tooling::flags
+-  TESTONLY
+-  PUBLIC
+-)
++  iree_cc_library(
++    NAME
++      coordinated_test_main
++    SRCS
++      "coordinated_test_main.cc"
++    DEPS
++      ::coordinated_test
++      ::gtest
++      gtest
++      iree::base
++      iree::base::tooling::flags
++    TESTONLY
++    PUBLIC
++  )
+ 
+-iree_cc_test(
+-  NAME
+-    coordinated_test_test
+-  SRCS
+-    "coordinated_test_test.cc"
+-  DEPS
+-    ::coordinated_test
+-    ::coordinated_test_main
+-    ::gtest
+-  LABELS
+-    "noriscv"
+-)
++  iree_cc_test(
++    NAME
++      coordinated_test_test
++    SRCS
++      "coordinated_test_test.cc"
++    DEPS
++      ::coordinated_test
++      ::coordinated_test_main
++      ::gtest
++    LABELS
++      "noriscv"
++  )
++endif()
+-- 
+2.53.0
+

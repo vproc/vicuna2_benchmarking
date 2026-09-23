@@ -1,0 +1,195 @@
+From 1b8a3cfbd2ded4f91fc7d5bbb2a0745d37ab63f7 Mon Sep 17 00:00:00 2001
+From: Han-Kuan Chen <hankuan.chen@sifive.com>
+Date: Wed, 8 Apr 2026 06:30:13 -0700
+Subject: [PATCH 3/5] Fix Generic RISC-V bare-metal build by avoiding libdl and
+ stubbing threading
+
+CMake's GNU platform logic was causing RISC-V Generic bare-metal builds
+(riscv*-unknown-elf) to link against libdl even though the sysroot does
+not provide it, and new async/threading code paths were pulling in POSIX
+and thread APIs that are not available on bare-metal targets.
+
+Fix this in three parts:
+- Clear CMAKE_DL_LIBS for Generic platforms in
+iree_setup_toolchain.cmake. Setting CMAKE_DL_LIBS only from the
+generic_riscv64.cmake toolchain file is not sufficient: CMake's Platform
+modules (e.g. Platform/GNU.cmake for GNU-style compilers) run after the
+toolchain file and unconditionally set CMAKE_DL_LIBS back to "dl".
+Overriding it in iree_setup_toolchain.cmake ensures that Generic builds
+do not pick up -ldl on their link lines.
+- Add a Generic-only threading stub implementation in
+runtime/src/iree/base/threading/thread_generic.c that provides the
+iree_thread_* API but returns IREE_STATUS_UNAVAILABLE or no-ops on
+IREE_PLATFORM_GENERIC. This allows code that depends on the thread API
+(such as proactor_thread) to link on bare-metal targets without dragging
+in a real OS thread implementation.
+- Exclude IREE_PLATFORM_GENERIC from the POSIX proactor path in
+runtime/src/iree/async/proactor_platform.c. Generic bare-metal platforms
+do not have the necessary POSIX APIs, so attempting to create a POSIX
+proactor results in unresolved symbols. For Generic we leave the
+proactor unavailable instead.
+
+Signed-off-by: Han-Kuan Chen <hankuan.chen@sifive.com>
+---
+ build_tools/cmake/iree_setup_toolchain.cmake  | 13 ++++
+ runtime/src/iree/async/proactor_platform.c    |  9 ++-
+ runtime/src/iree/base/threading/BUILD.bazel   |  1 +
+ .../src/iree/base/threading/CMakeLists.txt    |  1 +
+ .../src/iree/base/threading/thread_generic.c  | 69 +++++++++++++++++++
+ 5 files changed, 90 insertions(+), 3 deletions(-)
+ create mode 100644 runtime/src/iree/base/threading/thread_generic.c
+
+diff --git a/build_tools/cmake/iree_setup_toolchain.cmake b/build_tools/cmake/iree_setup_toolchain.cmake
+index 2db89d6a01..dd53d32683 100644
+--- a/build_tools/cmake/iree_setup_toolchain.cmake
++++ b/build_tools/cmake/iree_setup_toolchain.cmake
+@@ -69,6 +69,19 @@ macro(iree_setup_toolchain)
+   # Supports dynamic library loading.
+   #-----------------------------------------------------------------------------
+ 
++  # Bare-metal "Generic" targets (such as riscv*-unknown-elf) typically don't
++  # ship libdl in their sysroots. In those environments we don't support
++  # dynamic library loading anyway, and attempting to link against -ldl causes
++  # link failures. We cannot rely on setting CMAKE_DL_LIBS only from a
++  # toolchain file, as CMake's Platform modules (for example Platform/GNU.cmake
++  # for GNU-style compilers) may later reset CMAKE_DL_LIBS back to "dl".
++  # Clear it here so that libraries which depend on CMAKE_DL_LIBS (for example
++  # iree_base_threading::thread and iree_base_internal::dynamic_library) don't
++  # propagate an unusable -ldl into targets on Generic platforms.
++  if(CMAKE_SYSTEM_NAME STREQUAL "Generic")
++    set(CMAKE_DL_LIBS "")
++  endif()
++
+   set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_DL_LIBS})
+   check_symbol_exists(dlopen dlfcn.h IREE_HAVE_DLOPEN)
+   unset(CMAKE_REQUIRED_LIBRARIES)
+diff --git a/runtime/src/iree/async/proactor_platform.c b/runtime/src/iree/async/proactor_platform.c
+index 6d7a670fb9..385936ea7c 100644
+--- a/runtime/src/iree/async/proactor_platform.c
++++ b/runtime/src/iree/async/proactor_platform.c
+@@ -10,9 +10,11 @@
+ #include "iree/async/platform/io_uring/api.h"
+ #endif  // IREE_PLATFORM_LINUX && !IREE_PLATFORM_ANDROID
+ 
+-#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_WASM)
++#if !defined(IREE_PLATFORM_WINDOWS) && !defined(IREE_PLATFORM_EMSCRIPTEN) && \
++    !defined(IREE_PLATFORM_GENERIC) && !defined(IREE_PLATFORM_WASM)
+ #include "iree/async/platform/posix/api.h"
+-#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_WASM
++#endif  // !IREE_PLATFORM_WINDOWS && !IREE_PLATFORM_EMSCRIPTEN &&
++        // !IREE_PLATFORM_GENERIC && !IREE_PLATFORM_WASM
+ 
+ #if defined(IREE_PLATFORM_WINDOWS)
+ #include "iree/async/platform/iocp/api.h"
+@@ -51,7 +53,8 @@ iree_status_t iree_async_proactor_create_platform(
+ 
+   status = iree_async_proactor_create_js(options, allocator, out_proactor);
+ 
+-#else  // macOS, BSD, Android, etc.
++#elif !defined(IREE_PLATFORM_EMSCRIPTEN) && \
++    !defined(IREE_PLATFORM_GENERIC)  // macOS, BSD, Android, etc.
+ 
+   status = iree_async_proactor_create_posix(options, allocator, out_proactor);
+ 
+diff --git a/runtime/src/iree/base/threading/BUILD.bazel b/runtime/src/iree/base/threading/BUILD.bazel
+index 96f23d448f..f9ee7f93ab 100644
+--- a/runtime/src/iree/base/threading/BUILD.bazel
++++ b/runtime/src/iree/base/threading/BUILD.bazel
+@@ -54,6 +54,7 @@ iree_runtime_cc_library(
+     srcs = [
+         "thread.c",
+         "thread_darwin.c",
++        "thread_generic.c",
+         "thread_pthreads.c",
+         "thread_win32.c",
+     ],
+diff --git a/runtime/src/iree/base/threading/CMakeLists.txt b/runtime/src/iree/base/threading/CMakeLists.txt
+index c74d233867..4d4b550023 100644
+--- a/runtime/src/iree/base/threading/CMakeLists.txt
++++ b/runtime/src/iree/base/threading/CMakeLists.txt
+@@ -49,6 +49,7 @@ iree_cc_library(
+   SRCS
+     "thread.c"
+     "thread_darwin.c"
++    "thread_generic.c"
+     "thread_pthreads.c"
+     "thread_win32.c"
+   DEPS
+diff --git a/runtime/src/iree/base/threading/thread_generic.c b/runtime/src/iree/base/threading/thread_generic.c
+new file mode 100644
+index 0000000000..1e46133fd8
+--- /dev/null
++++ b/runtime/src/iree/base/threading/thread_generic.c
+@@ -0,0 +1,69 @@
++// Copyright 2026 The IREE Authors
++//
++// Licensed under the Apache License v2.0 with LLVM Exceptions.
++// See https://llvm.org/LICENSE.txt for license information.
++// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
++
++#include "iree/base/threading/thread.h"
++
++#if defined(IREE_PLATFORM_GENERIC)
++
++// Generic bare-metal platforms (such as riscv*-unknown-elf) don't provide a
++// native threading API. Provide minimal stub implementations so that code can
++// be linked, but return UNAVAILABLE from operations that would require
++// operating-system threads.
++
++struct iree_thread_t {};
++
++struct iree_thread_override_t {};
++
++IREE_API_EXPORT iree_status_t
++iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
++                   iree_thread_create_params_t params,
++                   iree_allocator_t allocator, iree_thread_t** out_thread) {
++  (void)entry;
++  (void)entry_arg;
++  (void)params;
++  (void)allocator;
++  (void)out_thread;
++  return iree_make_status(IREE_STATUS_UNAVAILABLE,
++                          "threads are not supported on this platform");
++}
++
++IREE_API_EXPORT void iree_thread_retain(iree_thread_t* thread) { (void)thread; }
++
++IREE_API_EXPORT void iree_thread_release(iree_thread_t* thread) {
++  (void)thread;
++}
++
++IREE_API_EXPORT uintptr_t iree_thread_id(iree_thread_t* thread) {
++  (void)thread;
++  return 0;
++}
++
++IREE_API_EXPORT iree_thread_override_t*
++iree_thread_priority_class_override_begin(
++    iree_thread_t* thread, iree_thread_priority_class_t priority_class) {
++  (void)thread;
++  (void)priority_class;
++  return NULL;
++}
++
++IREE_API_EXPORT void iree_thread_override_end(
++    iree_thread_override_t* override_token) {
++  (void)override_token;
++}
++
++IREE_API_EXPORT void iree_thread_request_affinity(
++    iree_thread_t* thread, iree_thread_affinity_t affinity) {
++  (void)thread;
++  (void)affinity;
++}
++
++IREE_API_EXPORT void iree_thread_resume(iree_thread_t* thread) { (void)thread; }
++
++IREE_API_EXPORT void iree_thread_join(iree_thread_t* thread) { (void)thread; }
++
++IREE_API_EXPORT void iree_thread_yield(void) {}
++
++#endif  // IREE_PLATFORM_GENERIC
+-- 
+2.53.0
+
