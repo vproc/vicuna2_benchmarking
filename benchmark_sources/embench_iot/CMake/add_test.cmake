@@ -55,25 +55,20 @@ macro(add_Benchmark_Verilator TEST)
         COMMAND ${CMAKE_OBJDUMP} -D ${TEST_NAME}.elf > ${TEST_NAME}_dump.txt
     )
     #VERY DANGEROUS TO USE TRACE
+    set(VERILATOR_EXE_FLAGS "")
+    if(NOT INSTR_TRACE_DIR STREQUAL "NONE")
+        set(VERILATOR_EXE_FLAGS ${VERILATOR_EXE_FLAGS} --itrace ${INSTR_TRACE_DIR}/${TEST_NAME}_trace.txt)
+    endif()
     if(TRACE)
-        set(VCD_TRACE_FLAG "--trace")
-        set(VCD_TRACE_ARG "${BUILD_DIR}/benchmark_sources/embench_iot/test_${TEST_NAME}_sig.vcd")
-    else()
-        set(VCD_TRACE_FLAG "")
-        set(VCD_TRACE_ARG "")
+        set(VERILATOR_EXE_FLAGS ${VERILATOR_EXE_FLAGS} --trace ${CMAKE_CURRENT_BINARY_DIR}/test_${TEST_NAME}_sig.vcd)
     endif()
-
     if(COMMIT_LOG)
-        set(COMMIT_FLAG "--commit")
-        set(COMMIT_ARG "${BUILD_DIR}/benchmark_sources/embench_iot/")
-    else()
-        set(COMMIT_FLAG "")
-        set(COMMIT_ARG "")
+        set(VERILATOR_EXE_FLAGS ${VERILATOR_EXE_FLAGS} --commit ${CMAKE_CURRENT_BINARY_DIR})
     endif()
 
-    #Add Test
+    # Add Test
     add_test(NAME ${TEST_NAME}
-        COMMAND ./${VERILATOR_MODEL_DIR}/build/verilated_model ${CMAKE_CURRENT_BINARY_DIR}/prog_${TEST_NAME}.txt ${MEM_PORTS} ${MEM_W} 4194304 ${MEM_LATENCY} 1 ${TEST_NAME} ${VREG_W} 0 ${VCD_TRACE_FLAG} ${VCD_TRACE_ARG} ${COMMIT_FLAG} ${COMMIT_ARG} #TODO: PASS ALL THESE ARGUMENTS IN FROM USER
+        COMMAND ./${VERILATOR_MODEL_DIR}/build/verilated_model ${CMAKE_CURRENT_BINARY_DIR}/prog_${TEST_NAME}.txt ${MEM_PORTS} ${MEM_W} 4194304 ${MEM_LATENCY} 1 ${TEST_NAME} ${VREG_W} 0 ${VERILATOR_EXE_FLAGS} #TODO: PASS ALL THESE ARGUMENTS IN FROM USER
         WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../..)
 
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 1000) #TODO: Find a reasonable timeout for these tests

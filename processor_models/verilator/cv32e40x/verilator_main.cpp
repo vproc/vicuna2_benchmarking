@@ -14,7 +14,7 @@
 #include "verilator_support_cv32e40x.h"
 
 int main(int argc, char **argv) {
-  fprintf(stderr, "Starting Verilator Main()\n");
+  fprintf(stderr, "Starting Verilator Main() (cv32e40x)\n");
 
   int exit_code = 0;
 
@@ -34,7 +34,6 @@ int main(int argc, char **argv) {
   FILE *fxreglog = NULL;
   auto const program_name = argv[0];
 
-  std::fprintf(stderr, "More args\n");
   static struct option long_options[] = {{"itrace", required_argument, 0, 'i'},
                                          {"trace", required_argument, 0, 't'},
                                          {"commit", required_argument, 0, 'c'},
