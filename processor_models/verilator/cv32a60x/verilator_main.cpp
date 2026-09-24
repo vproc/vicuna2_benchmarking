@@ -47,9 +47,7 @@ int main(int argc, char **argv) {
     case 'i':
       // Enable instruction tracing
       std::fprintf(stderr, "Enable instruction tracing to %s\n", optarg);
-      std::fprintf(stderr,
-                   "Warning, instruction tracing currently not available\n");
-      //   enable_inst_trace(optarg);
+      enable_inst_trace(optarg);
       break;
     case 'c':
       // Init regfile logs
