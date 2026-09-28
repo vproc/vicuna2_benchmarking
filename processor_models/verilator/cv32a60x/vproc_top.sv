@@ -419,7 +419,7 @@ assign no_outstanding_vlsu = 1'b1;
 
 //Connection for CVA6 data ports
 always_comb begin
-  mem_req_o = (obi_load_req.req && no_outstanding_vlsu) || (obi_store_req.req && no_outstanding_vlsu);
+  mem_req_o = (obi_load_req.req && no_outstanding_vlsu) || (obi_store_req.req);
   mem_id_o  = obi_store_req.a.aid;//always either store or load id
   obi_load_rsp.gnt = 1'b0; //only grant cv32a60x the memory interface when no vector loads or stores are outstanding
 
@@ -428,7 +428,7 @@ always_comb begin
   mem_we_o = obi_store_req.a.we & obi_store_req.req;
   mem_be_o = obi_store_req.a.be; //does loading half-words change this?
   mem_src_o = 1'b0; //Scalar source (Store so this signal not required, but here for completeness)
-  obi_store_rsp.gnt = mem_gnt_i && obi_store_req.req && no_outstanding_vlsu;
+  obi_store_rsp.gnt = mem_gnt_i && obi_store_req.req;
       
   if (obi_load_req.req && !obi_store_req.req && no_outstanding_vlsu)begin 
       //if vector unit not using memory interface and a valid scalar load

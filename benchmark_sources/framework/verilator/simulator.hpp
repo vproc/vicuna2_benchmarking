@@ -5,6 +5,11 @@
 #include <cstdint>
 
 extern "C" {
+void _exit(int status) {
+    volatile char* exit_port = (volatile char*)0x00000408;
+    *exit_port = (char)status;
+}
+
 void __attribute__((noinline)) address_match_start() { volatile int a = 1; }
 void __attribute__((noinline)) address_match_end() { volatile int a = 1; }
 }
@@ -40,13 +45,9 @@ public:
   };
 
   // Termination success or failure function for this simulator
-  void terminate(int code) // TODO: Int return codes
+  void terminate(int code)
   {
-    if (code == 0) {
-      *terminate_addr = 0x0; // Write 0x0 to signal success
-    } else {
-      *terminate_addr = 0xf; // Write 0xF to signal success
-    }
+    *terminate_addr = code; // Write return code to termination address
   };
 
   // Cleanup any allocatations

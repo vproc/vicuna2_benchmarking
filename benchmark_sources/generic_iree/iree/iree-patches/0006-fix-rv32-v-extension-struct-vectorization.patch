@@ -1,0 +1,192 @@
+diff --git a/runtime/src/iree/vm/bytecode/dispatch.c b/runtime/src/iree/vm/bytecode/dispatch.c
+index b2e50da1bc..9dbce1bf6a 100644
+--- a/runtime/src/iree/vm/bytecode/dispatch.c
++++ b/runtime/src/iree/vm/bytecode/dispatch.c
+@@ -384,8 +384,7 @@ static iree_status_t iree_vm_bytecode_internal_enter(
+     uint16_t src_reg = src_reg_list->registers[i];
+     if (src_reg & IREE_VM_ISA_REF_REGISTER_TYPE_BIT) {
+       uint16_t dst_reg = ref_reg_offset++;
+-      memset(&dst_regs->ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK], 0,
+-             sizeof(iree_vm_ref_t));
++      dst_regs->ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK].ptr = NULL; dst_regs->ref[dst_reg & IREE_VM_ISA_REF_REGISTER_MASK].type = IREE_VM_REF_TYPE_NULL;
+       iree_vm_ref_retain_or_move(
+           src_reg & IREE_VM_ISA_REF_REGISTER_MOVE_BIT,
+           &src_regs.ref[src_reg & IREE_VM_ISA_REF_REGISTER_MASK],
+diff --git a/runtime/src/iree/vm/ref.c b/runtime/src/iree/vm/ref.c
+index 2ef1608b88..3ba38b5033 100644
+--- a/runtime/src/iree/vm/ref.c
++++ b/runtime/src/iree/vm/ref.c
+@@ -1,3 +1,4 @@
++#pragma GCC optimize ("no-tree-vectorize")
+ // Copyright 2019 The IREE Authors
+ //
+ // Licensed under the Apache License v2.0 with LLVM Exceptions.
+@@ -163,20 +164,20 @@ IREE_API_EXPORT void iree_vm_ref_retain(iree_vm_ref_t* ref,
+   // potentially release.
+   IREE_VM_REF_ASSERT(ref);
+   IREE_VM_REF_ASSERT(out_ref);
+-  iree_vm_ref_t src_ref = *ref;
++  iree_vm_ref_t src_ref; src_ref.ptr = ref->ptr; src_ref.type = ref->type;
+   if (src_ref.ptr) {
+     iree_atomic_ref_count_t* counter = iree_vm_get_ref_counter_ptr(&src_ref);
+     iree_atomic_ref_count_inc(counter);
+     iree_vm_ref_trace("RETAIN", ref);
+   }
+-  iree_vm_ref_t dst_ref = *out_ref;
++  iree_vm_ref_t dst_ref; dst_ref.ptr = out_ref->ptr; dst_ref.type = out_ref->type;
+   if (dst_ref.ptr) {
+     // Output ref contains a value that should be released first.
+     // Note that we check above for it being the same as the new value so we
+     // don't do extra work unless we have to.
+     iree_vm_ref_release(&dst_ref);
+   }
+-  *out_ref = src_ref;
++  out_ref->ptr = src_ref.ptr; out_ref->type = src_ref.type;
+ }
+ 
+ IREE_API_EXPORT iree_status_t iree_vm_ref_retain_checked(
+@@ -184,7 +185,7 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_retain_checked(
+   IREE_VM_REF_ASSERT(ref);
+   IREE_VM_REF_ASSERT(type);
+   IREE_VM_REF_ASSERT(out_ref);
+-  iree_vm_ref_t src_ref = *ref;
++  iree_vm_ref_t src_ref; src_ref.ptr = ref->ptr; src_ref.type = ref->type;
+   if (src_ref.type != IREE_VM_REF_TYPE_NULL && src_ref.type != type &&
+       type != IREE_VM_REF_TYPE_ANY) {
+     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+@@ -211,7 +212,7 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_retain_or_move_checked(
+   IREE_VM_REF_ASSERT(ref);
+   IREE_VM_REF_ASSERT(type);
+   IREE_VM_REF_ASSERT(out_ref);
+-  iree_vm_ref_t src_ref = *ref;
++  iree_vm_ref_t src_ref; src_ref.ptr = ref->ptr; src_ref.type = ref->type;
+   if (src_ref.type != IREE_VM_REF_TYPE_NULL && src_ref.type != type &&
+       type != IREE_VM_REF_TYPE_ANY) {
+     // Make no changes on failure.
+@@ -224,13 +225,13 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_retain_or_move_checked(
+ 
+ IREE_API_EXPORT void iree_vm_ref_release(iree_vm_ref_t* ref) {
+   IREE_VM_REF_ASSERT(ref);
+-  iree_vm_ref_t temp_ref = *ref;
++  iree_vm_ref_t temp_ref; temp_ref.ptr = ref->ptr; temp_ref.type = ref->type;
+   if (temp_ref.type == IREE_VM_REF_TYPE_NULL || temp_ref.ptr == NULL) return;
+ #if defined(IREE_VM_REF_DEBUG_MOVE)
+   // In debug move mode, poisoned refs from moved-from registers are cleaned up
+   // during frame cleanup. Just clear them without trying to release.
+   if (temp_ref.type == IREE_VM_REF_TYPE_POISONED) {
+-    memset(ref, 0, sizeof(*ref));
++    ref->ptr = NULL; ref->type = IREE_VM_REF_TYPE_NULL;
+     return;
+   }
+ #endif  // IREE_VM_REF_DEBUG_MOVE
+@@ -248,7 +249,7 @@ IREE_API_EXPORT void iree_vm_ref_release(iree_vm_ref_t* ref) {
+   }
+ 
+   // Reset ref to point at nothing.
+-  memset(ref, 0, sizeof(*ref));
++  ref->ptr = NULL; ref->type = IREE_VM_REF_TYPE_NULL;
+ }
+ 
+ IREE_API_EXPORT void iree_vm_ref_assign(iree_vm_ref_t* ref,
+@@ -257,20 +258,20 @@ IREE_API_EXPORT void iree_vm_ref_assign(iree_vm_ref_t* ref,
+   IREE_VM_REF_ASSERT(out_ref);
+ 
+   // NOTE: ref and out_ref may alias.
+-  iree_vm_ref_t src_ref = *ref;
++  iree_vm_ref_t src_ref; src_ref.ptr = ref->ptr; src_ref.type = ref->type;
+   if (ref == out_ref) {
+     // Source == target; ignore entirely.
+     return;
+   }
+ 
+-  iree_vm_ref_t dst_ref = *out_ref;
++  iree_vm_ref_t dst_ref; dst_ref.ptr = out_ref->ptr; dst_ref.type = out_ref->type;
+   if (dst_ref.ptr != NULL) {
+     // Release existing value.
+     iree_vm_ref_release(&dst_ref);
+   }
+ 
+   // Assign ref to out_ref (without incrementing counter).
+-  *out_ref = src_ref;
++  out_ref->ptr = src_ref.ptr; out_ref->type = src_ref.type;
+ }
+ 
+ IREE_API_EXPORT void iree_vm_ref_move(iree_vm_ref_t* ref,
+@@ -285,7 +286,7 @@ IREE_API_EXPORT void iree_vm_ref_move(iree_vm_ref_t* ref,
+   }
+ 
+   // Reset input ref so it points at nothing.
+-  iree_vm_ref_t src_ref = *ref;
++  iree_vm_ref_t src_ref; src_ref.ptr = ref->ptr; src_ref.type = ref->type;
+ #if defined(IREE_VM_REF_DEBUG_MOVE)
+   // Poison the source ref with a sentinel value to detect use-after-move.
+   // If the compiler incorrectly marked this as a last-use when it's actually
+@@ -293,17 +294,17 @@ IREE_API_EXPORT void iree_vm_ref_move(iree_vm_ref_t* ref,
+   ref->ptr = (void*)(uintptr_t)IREE_VM_REF_TYPE_POISONED;
+   ref->type = IREE_VM_REF_TYPE_POISONED;
+ #else
+-  memset(ref, 0, sizeof(*ref));
++  ref->ptr = NULL; ref->type = IREE_VM_REF_TYPE_NULL;
+ #endif  // IREE_VM_REF_DEBUG_MOVE
+ 
+-  iree_vm_ref_t dst_ref = *out_ref;
++  iree_vm_ref_t dst_ref; dst_ref.ptr = out_ref->ptr; dst_ref.type = out_ref->type;
+   if (dst_ref.ptr != NULL) {
+     // Release existing value.
+     iree_vm_ref_release(&dst_ref);
+   }
+ 
+   // Assign ref to out_ref (without incrementing counter).
+-  *out_ref = src_ref;
++  out_ref->ptr = src_ref.ptr; out_ref->type = src_ref.type;
+ }
+ 
+ IREE_API_EXPORT bool iree_vm_ref_is_null(const iree_vm_ref_t* ref) {
+diff --git a/runtime/src/iree/vm/ref.h b/runtime/src/iree/vm/ref.h
+index dcba1fe35d..f9c942fc05 100644
+--- a/runtime/src/iree/vm/ref.h
++++ b/runtime/src/iree/vm/ref.h
+@@ -320,32 +320,36 @@ IREE_API_EXPORT bool iree_vm_ref_equal(const iree_vm_ref_t* lhs,
+   iree_vm_ref_type_t name##_registration = 0;                               \
+   IREE_API_EXPORT iree_vm_ref_t name##_retain_ref(T* value) {               \
+     IREE_VM_REF_ASSERT(name##_registration);                                \
+-    iree_vm_ref_t ref = {0};                                                \
++    iree_vm_ref_t ref;                                                      \
++    ref.ptr = NULL;                                                         \
++    ref.type = IREE_VM_REF_TYPE_NULL;                                       \
+     iree_vm_ref_wrap_retain(value, name##_type(), &ref);                    \
+     return ref;                                                             \
+   }                                                                         \
+   IREE_API_EXPORT iree_vm_ref_t name##_move_ref(T* value) {                 \
+     IREE_VM_REF_ASSERT(name##_registration);                                \
+-    iree_vm_ref_t ref = {0};                                                \
++    iree_vm_ref_t ref;                                                      \
++    ref.ptr = NULL;                                                         \
++    ref.type = IREE_VM_REF_TYPE_NULL;                                       \
+     iree_vm_ref_wrap_assign(value, name##_type(), &ref);                    \
+     return ref;                                                             \
+   }                                                                         \
+   IREE_API_EXPORT iree_status_t name##_check_deref(const iree_vm_ref_t ref, \
+                                                    T** out_ptr) {           \
+     IREE_VM_REF_ASSERT(name##_registration);                                \
++    if (out_ptr) *out_ptr = NULL;                                           \
+     IREE_RETURN_IF_ERROR(iree_vm_ref_check(ref, name##_type()));            \
+-    *out_ptr = (T*)ref.ptr;                                                 \
++    if (out_ptr) *out_ptr = (T*)ref.ptr;                                    \
+     return iree_ok_status();                                                \
+   }                                                                         \
+   IREE_API_EXPORT iree_status_t name##_check_deref_or_null(                 \
+       const iree_vm_ref_t ref, T** out_ptr) {                               \
+     IREE_VM_REF_ASSERT(name##_registration);                                \
+-    if (ref.type != IREE_VM_REF_TYPE_NULL) {                                \
++    if (out_ptr) *out_ptr = NULL;                                           \
++    if (ref.ptr && ref.type != IREE_VM_REF_TYPE_NULL) {                     \
+       IREE_RETURN_IF_ERROR(iree_vm_ref_check(ref, name##_type()));          \
+-      *out_ptr = (T*)ref.ptr;                                               \
+-    } else {                                                                \
+-      *out_ptr = NULL;                                                      \
+     }                                                                       \
++    if (out_ptr) *out_ptr = (T*)ref.ptr;                                    \
+     return iree_ok_status();                                                \
+   }
+ 

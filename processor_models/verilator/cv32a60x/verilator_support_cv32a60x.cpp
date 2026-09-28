@@ -148,7 +148,7 @@ void update_mem_load(Vvproc_top *top, uint32_t address, bool req_valid,
     queue_meta[0][1] = req_src;
     queue_meta[0][2] = 0;
   } else if (req_valid) {
-    fprintf(stderr, "ERROR: READ ATTEMPTED OUTSIDE OF VALID ADDRESS SPACE\n");
+    fprintf(stderr, "ERROR: READ ATTEMPTED OUTSIDE OF VALID ADDRESS SPACE: 0x%08x\n", address);
   }
 }
 
@@ -184,8 +184,7 @@ void update_mem_write(Vvproc_top *top, uint32_t address, bool req_valid,
         }
       }
     } else {
-      fprintf(stderr,
-              "ERROR: WRITE ATTEMPTED OUTSIDE OF VALID ADDRESS SPACE\n");
+      fprintf(stderr, "ERROR: WRITE ATTEMPTED OUTSIDE OF VALID ADDRESS SPACE: 0x%08x\n", address);
     }
     // queue_valid[mem_lat-1] = true; //need to signal valid on store interface
     // for accepted transaction.  Can always respond in 1 cycle due to store

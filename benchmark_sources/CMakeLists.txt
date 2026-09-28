@@ -10,6 +10,12 @@ endif()
 
 if(${BENCHMARK_SUITE} STREQUAL "generic_cpp")
     add_subdirectory(generic_cpp generic_cpp)
+elseif(${BENCHMARK_SUITE} STREQUAL "generic_iree")
+    # generic_iree requires FRAMEWORK=IREE
+    if(NOT ${FRAMEWORK} STREQUAL "IREE")
+        message(FATAL_ERROR "generic_iree suite requires FRAMEWORK=IREE")
+    endif()
+    add_subdirectory(generic_iree generic_iree)
 elseif(${BENCHMARK_SUITE} STREQUAL "MLPerfTiny")
     add_subdirectory(MLPerfTiny MLPerfTiny)
 elseif(${BENCHMARK_SUITE} STREQUAL "embench_dsp")

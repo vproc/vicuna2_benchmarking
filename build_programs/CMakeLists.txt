@@ -17,6 +17,8 @@ message(STATUS "CMake Version ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION}.${CM
 
 set(BENCHMARK_SUITE "NONE" CACHE STRING "Benchmark Suite to compile.  Name of the top level folder in /Benchmark_Sources")
 set(COMPILER "NONE" CACHE STRING "GCC or LLVM")
+set(FRAMEWORK "TFLM" CACHE STRING "Deployment framework used by benchmark suites that require one (TFLM or IREE)")
+set_property(CACHE FRAMEWORK PROPERTY STRINGS TFLM IREE)
 
 #####
 # Enable/Disable different simulators.  All enabled by default
@@ -166,6 +168,7 @@ endif()
 
 include(${TOOLCHAIN_TOP}/CMake/toolchain_build.cmake) #include toolchain macros
 
+message(STATUS "Selected FRAMEWORK = ${FRAMEWORK}")
 
 #######
 ## Compiler Selection

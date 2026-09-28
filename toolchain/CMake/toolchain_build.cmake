@@ -11,6 +11,10 @@ macro(build_gcc_multilib)
             message(STATUS "Downloading Fedora Dependencies")
             execute_process(COMMAND sudo yum install autoconf automake python3 libmpc-devel mpfr-devel gmp-devel gawk  bison flex texinfo patchutils gcc gcc-c++ zlib-devel expat-devel libslirp-devel ncurses-devel
                             WORKING_DIRECTORY ${TOOLCHAIN_TOP})
+        elseif(DIST STREQUAL "Arch")
+            message(STATUS "Downloading Arch Linux Dependencies")
+            execute_process(COMMAND sudo pacman -S --needed --noconfirm base-devel autoconf automake curl python python-pip python-tomli libmpc mpfr gmp gawk bison flex texinfo gperf libtool patchutils bc zlib expat ninja git cmake glib2 libslirp ncurses
+                            WORKING_DIRECTORY ${TOOLCHAIN_TOP})
         else()
             message(WARNING "MIGHT NEED TO DOWNLOAD DEPENDENCIES FOR YOUR DISTRIBUTION FOR GCC")
         endif()
@@ -45,6 +49,10 @@ macro(build_gcc_header_only ARCH)
             message(STATUS "Downloading Fedora Dependencies")
             execute_process(COMMAND sudo yum install autoconf automake python3 libmpc-devel mpfr-devel gmp-devel gawk  bison flex texinfo patchutils gcc gcc-c++ zlib-devel expat-devel libslirp-devel ncurses-devel
                             WORKING_DIRECTORY ${TOOLCHAIN_TOP})
+        elseif(DIST STREQUAL "Arch")
+            message(STATUS "Downloading Arch Linux Dependencies")
+            execute_process(COMMAND sudo pacman -S --needed --noconfirm base-devel autoconf automake curl python python-pip python-tomli libmpc mpfr gmp gawk bison flex texinfo gperf libtool patchutils bc zlib expat ninja git cmake glib2 libslirp ncurses
+                            WORKING_DIRECTORY ${TOOLCHAIN_TOP})
         else()
             message(WARNING "MIGHT NEED TO DOWNLOAD DEPENDENCIES FOR YOUR DISTRIBUTION FOR GCC")
         endif()
@@ -78,6 +86,10 @@ macro(build_llvm)
         elseif(DIST STREQUAL "Fedora")
             message(STATUS "Downloading Fedora Dependencies")
             execute_process(COMMAND sudo yum install 
+                            WORKING_DIRECTORY ${TOOLCHAIN_TOP})
+        elseif(DIST STREQUAL "Arch")
+            message(STATUS "Downloading Arch Linux Dependencies")
+            execute_process(COMMAND sudo pacman -S --needed --noconfirm base-devel cmake ninja clang lld python zlib libxml2
                             WORKING_DIRECTORY ${TOOLCHAIN_TOP})
         else()
             message(WARNING "MIGHT NEED TO DOWNLOAD DEPENDENCIES FOR YOUR DISTRIBUTION FOR LLVM")
@@ -116,6 +128,10 @@ macro(build_spike)
             message(STATUS "Downloading Fedora Dependencies")
             execute_process(COMMAND sudo yum install device-tree-compiler libboost-regex-dev libboost-system-dev
                             WORKING_DIRECTORY ${TOOLCHAIN_TOP})
+        elseif(DIST STREQUAL "Arch")
+            message(STATUS "Downloading Arch Linux Dependencies")
+            execute_process(COMMAND sudo pacman -S --needed --noconfirm base-devel dtc boost
+                            WORKING_DIRECTORY ${TOOLCHAIN_TOP})
         else()
             message(WARNING "MIGHT NEED TO DOWNLOAD DEPENDENCIES FOR YOUR DISTRIBUTION FOR SPIKE")
         endif()
@@ -144,6 +160,10 @@ macro(build_verilator)
         elseif(DIST STREQUAL "Fedora")
             message(STATUS "Downloading Fedora Dependencies")
             execute_process(COMMAND sudo yum install help2man perl python3 make autoconf flex bison
+                            WORKING_DIRECTORY ${TOOLCHAIN_TOP})
+        elseif(DIST STREQUAL "Arch")
+            message(STATUS "Downloading Arch Linux Dependencies")
+            execute_process(COMMAND sudo pacman -S --needed --noconfirm base-devel help2man perl python autoconf flex bison
                             WORKING_DIRECTORY ${TOOLCHAIN_TOP})
         else()
             message(WARNING "MIGHT NEED TO DOWNLOAD DEPENDENCIES FOR YOUR DISTRIBUTION FOR VERILATOR")
@@ -175,6 +195,10 @@ macro(build_gem5) #TODO: Move gem5 submodule to toolchain directory
             message(WARNING "Downloading Fedora Dependencies - WARNING THIS IS UNTESTED")
             execute_process(COMMAND sudo yum install build-essential scons python3-dev git pre-commit zlib1g zlib1g-dev libprotobuf-dev protobuf-compiler libprotoc-dev libgoogle-perftools-dev libboost-all-dev  libhdf5-serial-dev python3-pydot python3-venv python3-tk mypy m4 libcapstone-dev libpng-dev libelf-dev pkg-config wget cmake doxygen clang-format
                             WORKING_DIRECTORY ${TOOLCHAIN_TOP})
+        elseif(DIST STREQUAL "Arch")
+            message(WARNING "Downloading Arch Linux Dependencies")
+            execute_process(COMMAND sudo pacman -S --needed --noconfirm base-devel scons python git pre-commit zlib protobuf google-perftools boost hdf5 python-pydot python-virtualenv tk mypy m4 capstone libpng libelf pkgconf wget cmake doxygen clang
+                            WORKING_DIRECTORY ${TOOLCHAIN_TOP})
         else()
             message(WARNING "MIGHT NEED TO DOWNLOAD DEPENDENCIES FOR YOUR DISTRIBUTION FOR gem5")
         endif()
@@ -204,6 +228,10 @@ macro(build_etiss)
             message(WARNING "Downloading Fedora Dependencies - WARNING THIS IS UNTESTED")
             execute_process(COMMAND sudo yum install cmake build-essential libboost-all-dev libtinfo-dev zlib1g-dev
                             WORKING_DIRECTORY ${TOOLCHAIN_TOP})
+        elseif(DIST STREQUAL "Arch")
+            message(WARNING "Downloading Arch Linux Dependencies")
+            execute_process(COMMAND sudo pacman -S --needed --noconfirm base-devel cmake boost ncurses zlib
+                            WORKING_DIRECTORY ${TOOLCHAIN_TOP})
         else()
             message(WARNING "MIGHT NEED TO DOWNLOAD DEPENDENCIES FOR YOUR DISTRIBUTION FOR ETISS")
         endif()
@@ -216,5 +244,46 @@ macro(build_etiss)
                         WORKING_DIRECTORY ${TOOLCHAIN_TOP}/etiss_base/etiss_rvv/build)
         execute_process(COMMAND make -j32 -s install
                         WORKING_DIRECTORY ${TOOLCHAIN_TOP}/etiss_base/etiss_rvv/build)
+    endif()
+endmacro()
+
+macro(build_iree_compiler)
+    if(NOT IREE_HOST_BIN_DIR)
+        set(IREE_HOST_BIN_DIR "${TOOLCHAIN_TOP}/iree_compiler/install/bin" CACHE PATH "Path to IREE compiler binaries" FORCE)
+    endif()
+
+    find_program(IREE_HOST_C_COMPILER NAMES gcc cc REQUIRED)
+    find_program(IREE_HOST_CXX_COMPILER NAMES g++ c++ REQUIRED)
+
+    if(NOT EXISTS "${IREE_HOST_BIN_DIR}/iree-compile")
+        message(STATUS "IREE Compiler not found at ${IREE_HOST_BIN_DIR}, building natively from submodule")
+        
+        # Configure the IREE host compiler
+        execute_process(
+            COMMAND cmake -G Ninja
+                -B ${TOOLCHAIN_TOP}/iree_compiler/build
+                -S ${TOOLCHAIN_TOP}/../benchmark_sources/generic_iree/iree/iree-source
+                -DCMAKE_BUILD_TYPE=Release
+                -DIREE_BUILD_TESTS=OFF
+                -DIREE_BUILD_SAMPLES=OFF
+                -DIREE_HAL_DRIVER_LOCAL_TASK=OFF
+                -DIREE_ENABLE_LIBBACKTRACE=OFF
+                -DCMAKE_INSTALL_PREFIX=${TOOLCHAIN_TOP}/iree_compiler/install
+                -DCMAKE_C_COMPILER=${IREE_HOST_C_COMPILER}
+                -DCMAKE_CXX_COMPILER=${IREE_HOST_CXX_COMPILER}
+            RESULT_VARIABLE IREE_CONFIGURE_RESULT)
+        
+        if(NOT IREE_CONFIGURE_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to configure the native IREE compiler (exit code ${IREE_CONFIGURE_RESULT}).")
+        endif()
+        
+        # Add --parallel for faster compilation depending on the CPU cores and memory available.
+        execute_process(COMMAND cmake --build ${TOOLCHAIN_TOP}/iree_compiler/build --target install)
+        
+        if(NOT EXISTS "${IREE_HOST_BIN_DIR}/iree-compile")
+            message(FATAL_ERROR "Failed to build IREE compiler natively. Check the CMake logs.")
+        endif()
+    else()
+        message(STATUS "IREE Compiler found in ${IREE_HOST_BIN_DIR}")
     endif()
 endmacro()

@@ -1,0 +1,231 @@
+From b58ae9c5d1b3b12381f5ffc567c999318d485fd7 Mon Sep 17 00:00:00 2001
+From: Muhammed Efe Cetin <efectn@protonmail.com>
+Date: Thu, 16 Jul 2026 16:21:54 +0200
+Subject: [PATCH 5/5] apply more fixes for rv32 compilation
+
+---
+ riscv32_generic.cmake                         | 37 +++++++++++++++++++
+ runtime/src/iree/async/CMakeLists.txt         |  2 +-
+ .../async/platform/posix/cts/CMakeLists.txt   |  2 +-
+ runtime/src/iree/async/socket.c               |  6 ++-
+ runtime/src/iree/base/alignment.h             | 12 +++---
+ runtime/src/iree/base/string_view.c           |  4 +-
+ runtime/src/iree/base/time.c                  |  7 ++++
+ runtime/src/iree/hal/string_util.c            |  5 ++-
+ runtime/src/iree/modules/vmvx/module.c        |  6 +--
+ 9 files changed, 65 insertions(+), 16 deletions(-)
+ create mode 100644 riscv32_generic.cmake
+
+diff --git a/riscv32_generic.cmake b/riscv32_generic.cmake
+new file mode 100644
+index 0000000000..90c31f339b
+--- /dev/null
++++ b/riscv32_generic.cmake
+@@ -0,0 +1,37 @@
++set(CMAKE_SYSTEM_PROCESSOR riscv32)
++
++# Build the IREE runtime only
++set(IREE_BUILD_COMPILER OFF)
++
++# Tell CMake to skip targeting a specific operating system
++set(CMAKE_SYSTEM_NAME Generic)
++
++set(IREE_ENABLE_THREADING OFF)
++set(IREE_SYNCHRONIZATION_DISABLE_UNSAFE ON)
++set(IREE_HAL_DRIVER_DEFAULTS OFF)
++set(IREE_HAL_DRIVER_LOCAL_SYNC ON)
++set(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS OFF)
++set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF ON)
++set(IREE_HAL_EXECUTABLE_LOADER_VMVX_MODULE ON)
++set(IREE_HAL_EXECUTABLE_PLUGIN_DEFAULTS OFF)
++set(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF ON)
++set(IREE_BUILD_TESTS OFF)
++set(IREE_BUILD_SAMPLES OFF)
++# set(IREE_ENABLE_POSIX OFF CACHE BOOL "" FORCE)
++set(IREE_HAL_DRIVER_LOCAL_TASK OFF CACHE BOOL "" FORCE)
++# set(CMAKE_C_EXTENSIONS OFF CACHE BOOL "" FORCE) # runtime/src/iree/base/time.c:108:13: error: call to undeclared function 'clock_nanosleep'
++set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY OFF CACHE BOOL "" FORCE)
++set(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY OFF CACHE BOOL "" FORCE)
++set(IREE_BUILD_BINDINGS_TFLITE ON)
++
++set(TOOLCHAIN_PREFIX "riscv64-unknown-elf-")
++set(CMAKE_C_COMPILER ${TOOLCHAIN_PREFIX}gcc)
++set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PREFIX}g++)
++
++set(RISCV_FLAGS "-march=rv32imacv_zicsr_zifencei_zba_zbb_zbc_zbs -mabi=ilp32")
++
++set(CMAKE_C_FLAGS "${RISCV_FLAGS} -DIREE_CSPRNG_USE_STUB -DIREE_DEVICE_SIZE_T=uint32_t -DPRIdsz=PRIu32 -DIREE_SOCKETS_ENABLE=0 -DIREE_PLATFORM_GENERIC=1 -DIREE_FILE_IO_ENABLE=0 -DIREE_TIME_NOW_FN=\"{ return 0; }\" -DIREE_WAIT_UNTIL_FN=my_wait_until -Wno-format" CACHE STRING "")
++set(CMAKE_CXX_FLAGS "${RISCV_FLAGS} -DIREE_CSPRNG_USE_STUB -DIREE_DEVICE_SIZE_T=uint32_t -DPRIdsz=PRIu32 -DIREE_SOCKETS_ENABLE=0 -DIREE_PLATFORM_GENERIC=1 -DIREE_FILE_IO_ENABLE=0 -DIREE_TIME_NOW_FN=\"{ return 0; }\" -DIREE_WAIT_UNTIL_FN=my_wait_until -Wno-format" CACHE STRING "")
++
++
++set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+\ No newline at end of file
+diff --git a/runtime/src/iree/async/CMakeLists.txt b/runtime/src/iree/async/CMakeLists.txt
+index 1211e7c415..95ec5fae45 100644
+--- a/runtime/src/iree/async/CMakeLists.txt
++++ b/runtime/src/iree/async/CMakeLists.txt
+@@ -102,7 +102,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+   list(APPEND _platform_platform_deps iree::async::platform::iocp)
+ elseif(IREE_ARCH STREQUAL "wasm_32")
+   list(APPEND _platform_platform_deps iree::async::platform::js::proactor)
+-else()
++elseif(NOT CMAKE_SYSTEM_NAME STREQUAL "Generic")
+   list(APPEND _platform_platform_deps iree::async::platform::posix)
+ endif()
+ iree_cc_library(
+diff --git a/runtime/src/iree/async/platform/posix/cts/CMakeLists.txt b/runtime/src/iree/async/platform/posix/cts/CMakeLists.txt
+index 80cb3b9296..7f8f032856 100644
+--- a/runtime/src/iree/async/platform/posix/cts/CMakeLists.txt
++++ b/runtime/src/iree/async/platform/posix/cts/CMakeLists.txt
+@@ -19,7 +19,7 @@ iree_cc_library(
+   DEPS
+     iree::async
+     iree::async::cts::util::registry
+-    iree::async::platform::posix
++    # iree::async::platform::posix
+   TESTONLY
+   ALWAYSLINK
+   PUBLIC
+diff --git a/runtime/src/iree/async/socket.c b/runtime/src/iree/async/socket.c
+index 331402ecab..55d608ec59 100644
+--- a/runtime/src/iree/async/socket.c
++++ b/runtime/src/iree/async/socket.c
+@@ -12,7 +12,7 @@
+ // Platforms without socket support (generic bare-metal).
+ //===----------------------------------------------------------------------===//
+ 
+-#if defined(IREE_PLATFORM_GENERIC) || !defined(IREE_SOCKETS_ENABLE)
++#if defined(IREE_PLATFORM_GENERIC) || !IREE_SOCKETS_ENABLE
+ 
+ IREE_API_EXPORT iree_status_t iree_async_socket_create(
+     iree_async_proactor_t* proactor, iree_async_socket_type_t type,
+@@ -144,6 +144,8 @@ static inline iree_status_t iree_status_from_socket_error(void) {
+ // Socket lifecycle
+ //===----------------------------------------------------------------------===//
+ 
++#if !defined(IREE_PLATFORM_GENERIC) || IREE_SOCKETS_ENABLE
++
+ IREE_API_EXPORT iree_status_t iree_async_socket_create(
+     iree_async_proactor_t* proactor, iree_async_socket_type_t type,
+     iree_async_socket_options_t options, iree_async_socket_t** out_socket) {
+@@ -192,6 +194,8 @@ IREE_API_EXPORT void iree_async_socket_release(iree_async_socket_t* socket) {
+   }
+ }
+ 
++#endif
++
+ //===----------------------------------------------------------------------===//
+ // Socket operations
+ //===----------------------------------------------------------------------===//
+diff --git a/runtime/src/iree/base/alignment.h b/runtime/src/iree/base/alignment.h
+index 49a8798604..a396daa8af 100644
+--- a/runtime/src/iree/base/alignment.h
++++ b/runtime/src/iree/base/alignment.h
+@@ -132,9 +132,9 @@ static inline iree_host_size_t iree_host_size_next_power_of_two(
+   value |= value >> 4;
+   value |= value >> 8;
+   value |= value >> 16;
+-  if (sizeof(iree_host_size_t) == 8) {
+-    value |= value >> 32;
+-  }
++#if defined(IREE_PTR_SIZE_64)
++  value |= value >> 32;
++#endif  // IREE_PTR_SIZE_64
+   return value + 1;
+ }
+ 
+@@ -180,9 +180,9 @@ static inline iree_device_size_t iree_device_size_next_power_of_two(
+   value |= value >> 4;
+   value |= value >> 8;
+   value |= value >> 16;
+-  if (sizeof(iree_device_size_t) == 8) {
+-    value |= value >> 32;
+-  }
++#if defined(IREE_PTR_SIZE_64)
++  value |= value >> 32;
++#endif  // IREE_PTR_SIZE_64
+   return value + 1;
+ }
+ 
+diff --git a/runtime/src/iree/base/string_view.c b/runtime/src/iree/base/string_view.c
+index a01527f524..b9f5950809 100644
+--- a/runtime/src/iree/base/string_view.c
++++ b/runtime/src/iree/base/string_view.c
+@@ -182,14 +182,14 @@ iree_string_view_trim(iree_string_view_t value) {
+   iree_host_size_t start = 0;
+   iree_host_size_t end = value.size - 1;
+   while (value.size > 0 && start <= end) {
+-    if (isspace(value.data[start])) {
++    if (isspace((unsigned char)value.data[start])) {
+       start++;
+     } else {
+       break;
+     }
+   }
+   while (end > start) {
+-    if (isspace(value.data[end])) {
++    if (isspace((unsigned char)value.data[end])) {
+       --end;
+     } else {
+       break;
+diff --git a/runtime/src/iree/base/time.c b/runtime/src/iree/base/time.c
+index 195c1400b4..8b83ac824a 100644
+--- a/runtime/src/iree/base/time.c
++++ b/runtime/src/iree/base/time.c
+@@ -15,6 +15,13 @@
+ #include "iree/base/target_platform.h"
+ #include "iree/base/tracing.h"
+ 
++#if defined(IREE_PLATFORM_GENERIC)
++static bool my_wait_until(uint64_t deadline_ns) {
++  (void)deadline_ns;
++  return true;
++}
++#endif
++
+ IREE_API_EXPORT iree_time_t iree_time_now(void) {
+   return iree_platform_time_now();
+ }
+diff --git a/runtime/src/iree/hal/string_util.c b/runtime/src/iree/hal/string_util.c
+index 7a7b72f50c..fb74f5d6ce 100644
+--- a/runtime/src/iree/hal/string_util.c
++++ b/runtime/src/iree/hal/string_util.c
+@@ -245,7 +245,7 @@ IREE_API_EXPORT iree_status_t iree_hal_format_element_type(
+       prefix = "*";
+       break;
+   }
+-  int n = iree_snprintf(buffer, buffer_capacity, "%s%d", prefix, bit_count);
++  int n = iree_snprintf(buffer, buffer_capacity, "%s%" PRId32, prefix, bit_count);
+   if (n < 0) {
+     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "snprintf failed");
+   }
+@@ -676,7 +676,8 @@ IREE_API_EXPORT iree_status_t iree_hal_parse_buffer_elements(
+   iree_host_size_t token_start = IREE_STRING_VIEW_NPOS;
+   while (src_i < data_str.size) {
+     char c = data_str.data[src_i++];
+-    bool is_separator = isspace(c) || c == ',' || c == '[' || c == ']';
++    bool is_separator =
++        isspace((unsigned char)c) || c == ',' || c == '[' || c == ']';
+     if (token_start == IREE_STRING_VIEW_NPOS) {
+       if (!is_separator) {
+         token_start = src_i - 1;
+diff --git a/runtime/src/iree/modules/vmvx/module.c b/runtime/src/iree/modules/vmvx/module.c
+index 423276e378..dd37c04625 100644
+--- a/runtime/src/iree/modules/vmvx/module.c
++++ b/runtime/src/iree/modules/vmvx/module.c
+@@ -123,9 +123,9 @@ static iree_host_size_t iree_vmvx_2d_length_bound(
+ 
+ static iree_host_size_t iree_vmvx_cast_host_size(int64_t value,
+                                                  uint64_t* overflow) {
+-  if (sizeof(iree_host_size_t) == 4) {
+-    *overflow |= (uint64_t)value & 0xffffffff00000000ul;
+-  }
++#if defined(IREE_PTR_SIZE_32)
++  *overflow |= (uint64_t)value & 0xffffffff00000000ul;
++#endif  // IREE_PTR_SIZE_32
+   return (iree_host_size_t)value;
+ }
+ 
+-- 
+2.53.0
+
