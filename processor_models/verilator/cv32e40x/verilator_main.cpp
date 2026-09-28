@@ -15,7 +15,7 @@
 #include "verilator_support_cv32e40x.h"
 
 int main(int argc, char **argv) {
-  fprintf(stderr, "Starting Verilator Main()\n");
+  fprintf(stderr, "Starting Verilator Main() (cv32e40x)\n");
 
   int exit_code = 0;
 
@@ -35,7 +35,6 @@ int main(int argc, char **argv) {
   FILE *fxreglog = NULL;
   auto const program_name = argv[0];
 
-  std::fprintf(stderr, "More args\n");
   static struct option long_options[] = {{"itrace", required_argument, 0, 'i'},
                                          {"trace", required_argument, 0, 't'},
                                          {"commit", required_argument, 0, 'c'},
@@ -49,7 +48,7 @@ int main(int argc, char **argv) {
     switch (opt) {
     case 'i':
       // Enable instruction tracing
-      std::fprintf(stderr, "Enable instruction tracing\n");
+      std::fprintf(stderr, "Enable instruction tracing to %s\n", optarg);
       enable_inst_trace(optarg);
       break;
     case 'c':
@@ -241,6 +240,7 @@ int main(int argc, char **argv) {
 
     top->clk_i = 1;
     top->eval();
+    update_cycles();
     update_stats(top);
     update_vcd(tfp, cycles_begin_trace, cycles_end_trace);
 

@@ -60,8 +60,6 @@ typedef void VerilatedTrace_t;
 *   - *top          - pointer to verilator top module
 *   -  max_cycles   - number of cycles after which a stall is declared
 */
-inline uint32_t cycles_stalled = 0;
-inline uint32_t last_IF_PC = 0;
 bool check_stall(Vvproc_top *top, uint32_t max_cycles);
 
 /*
@@ -164,7 +162,6 @@ void dump_mem_region (uint32_t start_addr, uint32_t end_addr, unsigned char *mem
 /*
 *   Cycle count update
 */
-inline int cycles = 0;
 void update_cycles();
 
 /*
@@ -172,16 +169,12 @@ void update_cycles();
 * ARGS:
 *   - *top          - pointer to verilator top module
 */
-inline int current_WB_PC = 0;
-inline int last_WB_PC = 0;
-inline int instr = 0;
 void update_instructions(Vvproc_top *top);  //TODO:CVA6 Variant
 /*
 *   Total Vector Instructions executed update
 * ARGS:
 *   - *top          - pointer to verilator top module
 */
-inline int vector_instr = 0;
 void update_vector_count(Vvproc_top *top);
 
 /*
@@ -189,9 +182,6 @@ void update_vector_count(Vvproc_top *top);
 * ARGS:
 *   - *top          - pointer to verilator top module
 */
-inline int sum_vec_lengths = 0;
-inline int sum_vec_lengths_bytes = 0;
-inline float sum_vec_percentage = 0.0;
 void update_avg_vector_len(Vvproc_top *top);
 
 /*
@@ -251,5 +241,19 @@ void update_freg_commit(Vvproc_top *top, FILE *commit_log); //TODO:CVA6 Variant
 */
 void update_vreg_commit(Vvproc_top *top, int vreg_w, FILE *commit_log);
 
+/**
+ * @brief Enable instruction tracing
+ * @param path - The path to the output file
+ */
+auto enable_inst_trace(char const *path) -> void;
+
+/**
+ * @brief Format and write PC, instruction assembly, cycle, and cycle delta to
+ * file
+ * @param pc
+ * @param instruction
+ * @param cycle
+ */
+auto print_trace() -> void;
 
 #endif
