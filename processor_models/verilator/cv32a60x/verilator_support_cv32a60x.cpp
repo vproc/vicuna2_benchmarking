@@ -41,18 +41,23 @@ float sum_vec_percentage = 0.0;
  *   - *top          - pointer to verilator top module
  *   -  max_cycles   - number of cycles after which a stall is declared
  */
-bool check_stall(Vvproc_top *top, uint32_t max_cycles) {
+bool check_stall(Vvproc_top *top, uint32_t max_cycles)
+{
 
   uint32_t current_IF_PC = top->mem_iaddr_o;
-  if (current_IF_PC == last_IF_PC) {
+  if (current_IF_PC == last_IF_PC)
+  {
     cycles_stalled++;
-  } else {
+  }
+  else
+  {
     cycles_stalled = 0;
   }
 
   last_IF_PC = current_IF_PC;
 
-  if (cycles_stalled >= max_cycles) {
+  if (cycles_stalled >= max_cycles)
+  {
     fprintf(stderr, "ERROR: SIMULATION STALLED FOR %d CYCLES AT IF_PC = 0x%X\n",
             max_cycles, current_IF_PC);
     return true;
@@ -67,7 +72,8 @@ bool check_stall(Vvproc_top *top, uint32_t max_cycles) {
  *   - *top          - pointer to verilator top module
  *   -  address      - address to check for
  */
-bool check_PC(Vvproc_top *top, uint32_t address) {
+bool check_PC(Vvproc_top *top, uint32_t address)
+{
   return (top->mem_iaddr_o == address);
 }
 
@@ -76,7 +82,8 @@ bool check_PC(Vvproc_top *top, uint32_t address) {
  * edge) ARGS:
  *   - *top          - pointer to verilator top module
  */
-void advance_cycle(Vvproc_top *top) {
+void advance_cycle(Vvproc_top *top)
+{
   // rising clock edge
   top->clk_i = 1;
   top->eval();
@@ -92,7 +99,8 @@ void advance_cycle(Vvproc_top *top) {
  * edge) ARGS:
  *   - *top          - pointer to verilator top module
  */
-void advance_cycle_half(Vvproc_top *top, bool val) {
+void advance_cycle_half(Vvproc_top *top, bool val)
+{
   // clock
   top->clk_i = val;
   top->eval();
@@ -127,19 +135,23 @@ void update_mem_load(Vvproc_top *top, uint32_t address, bool req_valid,
                      unsigned char *model_data_i, bool *model_valid_i,
                      bool *model_err_i, bool *model_src_i,
                      unsigned char **queue_data, bool *queue_valid,
-                     bool **queue_meta, unsigned char *mem) {
+                     bool **queue_meta, unsigned char *mem)
+{
 
   uint32_t address_mask = address & 0x7FFFFFFF;
   // Next evaluate an outstanding request and put at the end of the buffer.
   volatile bool valid = (address_mask < mem_size) & req_valid;
 
   // set new queue entry to zero
-  for (int i = 0; i < mem_w / 8; i++) {
+  for (int i = 0; i < mem_w / 8; i++)
+  {
     queue_data[0][i] = 0;
   }
-  if (valid) {
+  if (valid)
+  {
     // Copy each valid byte into buffer
-    for (int i = 0; i < mem_w / 8; i++) {
+    for (int i = 0; i < mem_w / 8; i++)
+    {
       queue_data[0][i] |= mem[address_mask + i];
       // queue_data[0][i] |= 0;
     }
@@ -147,7 +159,9 @@ void update_mem_load(Vvproc_top *top, uint32_t address, bool req_valid,
     queue_meta[0][0] = false; // never an error (conflicts with write signal)
     queue_meta[0][1] = req_src;
     queue_meta[0][2] = 0;
-  } else if (req_valid) {
+  }
+  else if (req_valid)
+  {
     fprintf(stderr, "ERROR: READ ATTEMPTED OUTSIDE OF VALID ADDRESS SPACE\n");
   }
 }
@@ -171,19 +185,27 @@ void update_mem_write(Vvproc_top *top, uint32_t address, bool req_valid,
                       uint32_t mem_size, unsigned char *model_data_o,
                       unsigned char *model_be_o, bool *mem_w_valid_i,
                       bool *queue_valid, bool **queue_meta,
-                      unsigned char *mem) {
-  for (int i = mem_lat - 1; i > 0; i--) {
+                      unsigned char *mem)
+{
+  for (int i = mem_lat - 1; i > 0; i--)
+  {
     queue_valid[i] = queue_valid[i - 1];
   }
   uint32_t address_mask = address & 0x7FFFFFFF;
-  if (req_valid) {
-    if (address_mask < mem_size) {
-      for (int i = 0; i < mem_w / 8; i++) {
-        if ((model_be_o[i / 8] & (1 << (i % 8)))) {
+  if (req_valid)
+  {
+    if (address_mask < mem_size)
+    {
+      for (int i = 0; i < mem_w / 8; i++)
+      {
+        if ((model_be_o[i / 8] & (1 << (i % 8))))
+        {
           mem[address_mask + i] = model_data_o[i];
         }
       }
-    } else {
+    }
+    else
+    {
       fprintf(stderr,
               "ERROR: WRITE ATTEMPTED OUTSIDE OF VALID ADDRESS SPACE\n");
     }
@@ -202,9 +224,8 @@ void update_mem_write(Vvproc_top *top, uint32_t address, bool req_valid,
     //      //top->mem_src_i = 1;
     //      //top->mem_id_i = top->mem_id_o;
     //  }
-    queue_valid[0] =
-        req_valid; // on successful write, override initial values from mem_load
-    queue_meta[0][0] = false; // never an error (conflicts with write signal)
+    queue_valid[0] = req_valid; // on successful write, override initial values from mem_load
+    queue_meta[0][0] = false;   // never an error (conflicts with write signal)
     queue_meta[0][1] = req_src;
     queue_meta[0][2] = 1;
   }
@@ -224,10 +245,14 @@ void update_mem_write(Vvproc_top *top, uint32_t address, bool req_valid,
  */
 bool check_memmapio(uint32_t address, bool req_valid, uint32_t mem_w,
                     unsigned char *model_data_o, uint32_t memmap_address,
-                    char *data_out) {
-  if (req_valid) {
-    if (address == memmap_address) {
-      for (int i = 0; i < mem_w / 8; i++) {
+                    char *data_out)
+{
+  if (req_valid)
+  {
+    if (address == memmap_address)
+    {
+      for (int i = 0; i < mem_w / 8; i++)
+      {
         data_out[i] = model_data_o[i];
       }
       return true;
@@ -244,16 +269,19 @@ bool check_memmapio(uint32_t address, bool req_valid, uint32_t mem_w,
  *   mem_sz        - size of main memory to allocate
  *   *prog_path    - program to load into memory
  */
-unsigned char *load_program(uint32_t mem_sz, char *prog_path) {
+unsigned char *load_program(uint32_t mem_sz, char *prog_path)
+{
   unsigned char *mem = (unsigned char *)malloc(mem_sz);
-  if (mem == NULL) {
+  if (mem == NULL)
+  {
     fprintf(stderr, "ERROR: allocating %d bytes of memory: %s\n", mem_sz,
             strerror(errno));
     return NULL;
   }
 
   FILE *ftmp = fopen(prog_path, "r");
-  if (ftmp == NULL) {
+  if (ftmp == NULL)
+  {
     fprintf(stderr, "ERROR: invalid program path `%s': %s\n", prog_path,
             strerror(errno));
     return NULL;
@@ -261,16 +289,19 @@ unsigned char *load_program(uint32_t mem_sz, char *prog_path) {
   memset(mem, 0, mem_sz);
   char buf[256];
   int addr = 0;
-  while (fgets(buf, sizeof(buf), ftmp) != NULL) {
+  while (fgets(buf, sizeof(buf), ftmp) != NULL)
+  {
     if (buf[0] == '#' || buf[0] == '/')
       continue;
     char *ptr = buf;
-    if (buf[0] == '@') {
+    if (buf[0] == '@')
+    {
       addr = strtol(ptr + 1, &ptr, 16) * 4;
       while (*ptr == ' ')
         ptr++;
     }
-    while (*ptr != '\n' && *ptr != 0) {
+    while (*ptr != '\n' && *ptr != 0)
+    {
       int data = strtol(ptr, &ptr, 16);
       int i;
       for (i = 0; i < 4; i++)
@@ -294,15 +325,18 @@ unsigned char *load_program(uint32_t mem_sz, char *prog_path) {
  *   *dump_path        - file path to output file
  */
 void dump_mem_region(uint32_t start_addr, uint32_t end_addr, unsigned char *mem,
-                     char *dump_path) {
+                     char *dump_path)
+{
 
   FILE *ftmp = fopen(dump_path, "w");
-  if (ftmp == NULL) {
+  if (ftmp == NULL)
+  {
     fprintf(stderr, "ERROR: opening `%s': %s\n", dump_path, strerror(errno));
     return;
   }
   int addr;
-  for (addr = start_addr; addr < end_addr; addr += 4) {
+  for (addr = start_addr; addr < end_addr; addr += 4)
+  {
     int data = mem[addr] | (mem[addr + 1] << 8) | (mem[addr + 2] << 16) |
                (mem[addr + 3] << 24);
     fprintf(ftmp, "%08x\n", data);
@@ -314,7 +348,8 @@ void dump_mem_region(uint32_t start_addr, uint32_t end_addr, unsigned char *mem,
 /*
  *   Cycle count update
  */
-void update_cycles() {
+void update_cycles()
+{
   cycles++;
   return;
 }
@@ -324,12 +359,15 @@ void update_cycles() {
  * ARGS:
  *   - *top          - pointer to verilator top module
  */
-void update_instructions(Vvproc_top *top) {
+void update_instructions(Vvproc_top *top)
+{
   current_commit_pc = top->vproc_top->i_cva6_pipeline->pc_commit;
   // current_WB_PC = top->vproc_top->core->instruction_wb_pc;
-  if (current_commit_pc != last_commit_pc) {
+  if (current_commit_pc != last_commit_pc)
+  {
     n_instr++;
-    if (inst_trace) {
+    if (inst_trace)
+    {
       print_trace();
     }
   }
@@ -342,7 +380,8 @@ void update_instructions(Vvproc_top *top) {
  * ARGS:
  *   - *top          - pointer to verilator top module
  */
-void update_vector_count(Vvproc_top *top) {
+void update_vector_count(Vvproc_top *top)
+{
   // if( top->vproc_top->vcore_result_valid &&
   // top->vproc_top->vcore_result_ready){
   //     vector_instr++;
@@ -355,7 +394,8 @@ void update_vector_count(Vvproc_top *top) {
  * ARGS:
  *   - *top          - pointer to verilator top module
  */
-void update_avg_vector_len(Vvproc_top *top) {
+void update_avg_vector_len(Vvproc_top *top)
+{
   //  if( top->vproc_top->vcore_result_valid &&
   //  top->vproc_top->vcore_result_ready){
   //     sum_vec_lengths+= top->vproc_top->csr_vl_o; //running sum of number of
@@ -422,7 +462,8 @@ void update_avg_vector_len(Vvproc_top *top) {
  * ARGS:
  *   - *top          - pointer to verilator top module
  */
-void update_stats(Vvproc_top *top) {
+void update_stats(Vvproc_top *top)
+{
   update_cycles();
   update_instructions(top);
   update_vector_count(top);
@@ -432,7 +473,8 @@ void update_stats(Vvproc_top *top) {
 /*
  * Report current state of all collected statistics
  */
-void report_stats() {
+void report_stats()
+{
   fprintf(stderr, "Total Cycles: %d\n", cycles);
   fprintf(stderr, "Instruction Count: %d CPI : %f \n\n", n_instr,
           ((float)(cycles)) / ((float)n_instr));
@@ -456,10 +498,13 @@ void report_stats() {
  *   - end_cycles    - cycle count to end trace
  */
 void update_vcd(VerilatedTrace_t *tfp, uint32_t begin_cycles,
-                uint32_t end_cycles) {
-  if (tfp != NULL) {
+                uint32_t end_cycles)
+{
+  if (tfp != NULL)
+  {
     if ((cycles >= begin_cycles) && (cycles < end_cycles) ||
-        (end_cycles == 0)) {
+        (end_cycles == 0))
+    {
 #ifdef TRACE_VCD
       tfp->dump(cycles);
 #endif
@@ -477,7 +522,8 @@ void update_vcd(VerilatedTrace_t *tfp, uint32_t begin_cycles,
  *   - end_cycles    - cycle count to end trace
  */
 void update_inst_trace(Vvproc_top *top, FILE *inst_trace, uint32_t begin_cycles,
-                       uint32_t end_cycles) {
+                       uint32_t end_cycles)
+{
   // if (inst_trace != NULL)
   // {
   //     if ((cycles >= begin_cycles) && ( cycles < end_cycles) || (end_cycles
@@ -502,7 +548,8 @@ void update_inst_trace(Vvproc_top *top, FILE *inst_trace, uint32_t begin_cycles,
  *   - *top          - pointer to verilator top module
  *   - *commit_log   - pointer to .txt trace file output
  */
-void update_xreg_commit(Vvproc_top *top, FILE *commit_log) {
+void update_xreg_commit(Vvproc_top *top, FILE *commit_log)
+{
   // if(top->vproc_top->core->rf_we_wb)
   // {
   //     fprintf(commit_log, "x%d 0x%08x\n", top->vproc_top->core->rf_waddr_wb,
@@ -518,10 +565,12 @@ void update_xreg_commit(Vvproc_top *top, FILE *commit_log) {
  *   - *top          - pointer to verilator top module
  *   - *commit_log   - pointer to .txt trace file output
  */
-void update_freg_commit(Vvproc_top *top, FILE *commit_log) {
+void update_freg_commit(Vvproc_top *top, FILE *commit_log)
+{
 #ifdef RISCV_F
   if (top->vproc_top->fpu_ss_i->gen_fp_register_file__DOT__fpu_ss_regfile_i
-          ->fpr_commit_valid) {
+          ->fpr_commit_valid)
+  {
     fprintf(commit_log, "f%d 0x%08x\n",
             top->vproc_top->fpu_ss_i
                 ->gen_fp_register_file__DOT__fpu_ss_regfile_i->fpr_commit_addr,
@@ -540,7 +589,8 @@ void update_freg_commit(Vvproc_top *top, FILE *commit_log) {
  *   - vreg_w        - width of the vector registers
  *   - *commit_log   - pointer to .txt trace file output
  */
-void update_vreg_commit(Vvproc_top *top, int vreg_w, FILE *commit_log) {
+void update_vreg_commit(Vvproc_top *top, int vreg_w, FILE *commit_log)
+{
 #ifdef RISCV_ZVE32X
 // //write commit log for vregs.  Currently set up for one write port.  Only log
 // a commit when an element is actually written. Mask handled internally in case
@@ -573,7 +623,8 @@ void update_vreg_commit(Vvproc_top *top, int vreg_w, FILE *commit_log) {
  * @brief Enable instruction tracing
  * @param path - The path to the output file
  */
-auto enable_inst_trace(char const *path) -> void {
+auto enable_inst_trace(char const *path) -> void
+{
   inst_trace = true;
   inst_trace_file.open(path);
 }
@@ -585,7 +636,8 @@ auto enable_inst_trace(char const *path) -> void {
  * @param instruction
  * @param cycle
  */
-auto print_trace() -> void {
+auto print_trace() -> void
+{
   // TODO: do we need to print the instruction assembly? Currently, the number
   // of instructions is printed instead.
   static uint64_t last_cycle = 0;

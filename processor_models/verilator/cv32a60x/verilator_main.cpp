@@ -12,13 +12,15 @@
 #include "verilated.h"
 #include "verilator_support_cv32a60x.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   fprintf(stderr, "Starting Verilator Main()\n");
 
   int exit_code = 0;
 
   // Parse program arguments
-  if (argc < 10) {
+  if (argc < 10)
+  {
     fprintf(
         stderr,
         "ERROR: Correct Usage: %s PROG_PATHS_LIST MEM_PORTS MEM_W MEM_SZ "
@@ -42,8 +44,10 @@ int main(int argc, char **argv) {
   int option_index = 0;
 
   while ((opt = getopt_long(argc, argv, "i:c:t:", long_options,
-                            &option_index)) != -1) {
-    switch (opt) {
+                            &option_index)) != -1)
+  {
+    switch (opt)
+    {
     case 'i':
       // Enable instruction tracing
       std::fprintf(stderr, "Enable instruction tracing to %s\n", optarg);
@@ -59,11 +63,18 @@ int main(int argc, char **argv) {
       }
       break;
     case 't':
+      fprintf(stderr,
+              "Inside trace arg\n");
+      Verilated::traceEverOn(true);
       // Setup vcd trace file
       tfp = new VerilatedTrace_t;
       top->trace(tfp, 99); // Trace 99 levels of hierarchy
       tfp->open(optarg);
+      break;
     default:
+      fprintf(stderr,
+              "%c\n",
+              opt);
       fprintf(stderr,
               "Usage: %s [9 required args...] [--itrace|-i <filepath>] "
               "[--commit|-c <filepath>]\n",
@@ -79,42 +90,47 @@ int main(int argc, char **argv) {
   {
     char *endptr;
     mem_ports = strtol(argv[2], &endptr, 10);
-    if (mem_ports == 0 || *endptr != 0) {
+    if (mem_ports == 0 || *endptr != 0)
+    {
       fprintf(stderr, "ERROR: invalid MEM_PORTS argument\n");
       return 1;
     }
     mem_w = strtol(argv[3], &endptr, 10);
-    if (mem_w == 0 || *endptr != 0) {
+    if (mem_w == 0 || *endptr != 0)
+    {
       fprintf(stderr, "ERROR: invalid MEM_W argument\n");
       return 1;
     }
     mem_sz = strtol(argv[4], &endptr, 10);
-    if (mem_sz == 0 || *endptr != 0) {
+    if (mem_sz == 0 || *endptr != 0)
+    {
       fprintf(stderr, "ERROR: invalid MEM_SZ argument\n");
       return 1;
     }
     mem_latency = strtol(argv[5], &endptr, 10);
-    if (*endptr != 0) {
+    if (*endptr != 0)
+    {
       fprintf(stderr, "ERROR: invalid MEM_LATENCY argument\n");
       return 1;
     }
     extra_cycles = strtol(argv[6], &endptr, 10);
-    if (*endptr != 0) {
+    if (*endptr != 0)
+    {
       fprintf(stderr, "ERROR: invalid EXTRA_CYCLES argument\n");
       return 1;
     }
     num_cases = strtol(argv[9], &endptr, 10);
-    if (*endptr != 0) {
+    if (*endptr != 0)
+    {
       fprintf(stderr, "ERROR: invalid NUM_TEST_CASES argument\n");
       return 1;
     }
   }
-
-  Verilated::traceEverOn(true);
   // Verilated::commandArgs(argc, argv);
 
   FILE *fprogs = fopen(argv[1], "r");
-  if (fprogs == NULL) {
+  if (fprogs == NULL)
+  {
     fprintf(stderr, "ERROR: opening `%s': %s\n", argv[1], strerror(errno));
     return 2;
   }
@@ -131,7 +147,8 @@ int main(int argc, char **argv) {
 
   bool *mem_wvalid_queue = (bool *)malloc(sizeof(bool) * mem_latency);
 
-  for (int queue_pos = 0; queue_pos < mem_latency; queue_pos++) {
+  for (int queue_pos = 0; queue_pos < mem_latency; queue_pos++)
+  {
     mem_rdata_queue[queue_pos] =
         (unsigned char *)malloc(sizeof(unsigned char) * mem_w / 8);
     mem_meta_queue[queue_pos] = (bool *)malloc(
@@ -145,14 +162,16 @@ int main(int argc, char **argv) {
       (bool ***)malloc(sizeof(bool **) * mem_ports); // memory metadata port
   bool **vec_mem_wvalid_queue = (bool **)malloc(sizeof(bool *) * mem_ports);
 
-  for (int i = 0; i < mem_ports; i++) {
+  for (int i = 0; i < mem_ports; i++)
+  {
     vec_mem_rvalid_queue[i] = (bool *)malloc(sizeof(bool) * mem_latency);
     vec_mem_rdata_queue[i] = (unsigned char **)malloc(
         sizeof(unsigned char *) * mem_latency); // memory data port
     vec_mem_meta_queue[i] =
         (bool **)malloc(sizeof(bool *) * mem_latency); // memory metadata port
     vec_mem_wvalid_queue[i] = (bool *)malloc(sizeof(bool) * mem_latency);
-    for (int queue_pos = 0; queue_pos < mem_latency; queue_pos++) {
+    for (int queue_pos = 0; queue_pos < mem_latency; queue_pos++)
+    {
       vec_mem_rdata_queue[i][queue_pos] =
           (unsigned char *)malloc(sizeof(unsigned char) * mem_w / 8);
       vec_mem_meta_queue[i][queue_pos] = (bool *)malloc(
@@ -168,7 +187,8 @@ int main(int argc, char **argv) {
   // even though known instruction interface width of 32 bits, malloc like this
   // for compatability with memory management helper functions same with
   // metadata queue, known request source
-  for (int queue_pos = 0; queue_pos < mem_latency; queue_pos++) {
+  for (int queue_pos = 0; queue_pos < mem_latency; queue_pos++)
+  {
     mem_idata_queue[queue_pos] =
         (unsigned char *)malloc(sizeof(unsigned char) * 32 / 8);
     mem_imeta_queue[queue_pos] = (bool *)malloc(sizeof(bool) * 2);
@@ -195,7 +215,8 @@ int main(int argc, char **argv) {
   getline(&line, &line_sz, fprogs);
   // allocate sufficient storage space for the four paths (length of the
   // line, or at least 32 bytes)
-  if (line_sz < 32) {
+  if (line_sz < 32)
+  {
     line_sz = 32;
   }
   prog_path = (char *)realloc(prog_path, line_sz);
@@ -207,7 +228,8 @@ int main(int argc, char **argv) {
   int ref_start = 0, ref_end = 0, dump_start = 0, dump_end = 0, items;
   items = sscanf(line, "%s %s %x %x %s %x %x", prog_path, ref_path, &ref_start,
                  &ref_end, dump_path, &dump_start, &dump_end);
-  if (items == 0 || items == EOF) {
+  if (items == 0 || items == EOF)
+  {
     return -1;
   }
 
@@ -222,17 +244,21 @@ int main(int argc, char **argv) {
   //////////////////////////
   // Begin Program execution
   //////////////////////////
-  for (int i = 0; i < mem_ports; i++) {
-    for (int j = 0; j < mem_latency; j++) {
+  for (int i = 0; i < mem_ports; i++)
+  {
+    for (int j = 0; j < mem_latency; j++)
+    {
       vec_mem_rvalid_queue[i][j] = 0;
     }
   }
-  for (int i = 0; i < mem_latency; i++) {
+  for (int i = 0; i < mem_latency; i++)
+  {
     mem_rvalid_queue[i] = 0;
   }
   top->mem_rvalid_i = 0;
   top->mem_irvalid_i = 0;
-  for (int i = 0; i < mem_ports; i++) {
+  for (int i = 0; i < mem_ports; i++)
+  {
     top->vec_mem_rvalid_i[i] = 0;
   }
 
@@ -242,7 +268,8 @@ int main(int argc, char **argv) {
 
   top->clk_i = 0;
   top->rst_ni = 0;
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 10; i++)
+  {
     top->clk_i = 0;
     top->eval();
     update_stats(top);
@@ -257,9 +284,8 @@ int main(int argc, char **argv) {
   top->eval();
   update_stats(top);
   update_vcd(tfp, 0, 0);
-  top->mem_ignt_i = 1;
-  top->mem_gnt_i = 1;
-  for (int i = 0; i < mem_ports; i++) {
+  for (int i = 0; i < mem_ports; i++)
+  {
     top->vec_mem_rvalid_i[i] = 1;
   }
   char *endptr;
@@ -285,14 +311,16 @@ int main(int argc, char **argv) {
   bool imem_busy = false;
   bool dmem_busy = false;
   bool *vmem_busy = (bool *)malloc(sizeof(bool) * mem_ports);
-  for (int i = 0; i < mem_ports; i++) {
+  for (int i = 0; i < mem_ports; i++)
+  {
     vmem_busy[i] = false;
   }
 
   //////////////////////////
   // Program Execution - Infinite loop with defined exit conditions
   //////////////////////////
-  while (true) {
+  while (true)
+  {
 
     //////////////////////////
     // Advance to next clock cycle
@@ -311,15 +339,19 @@ int main(int argc, char **argv) {
     //////////////////////////
 
     // Update data memory interface signals
-    for (int i = 0; i < mem_w / 8; i++) {
+    for (int i = 0; i < mem_w / 8; i++)
+    {
       unsigned char *port = (unsigned char *)&(top->mem_rdata_i);
       port[i] = mem_rdata_queue[mem_latency - 1][i];
     }
 
-    if (!mem_meta_queue[mem_latency - 1][2]) {
+    if (!mem_meta_queue[mem_latency - 1][2])
+    {
       top->mem_rvalid_i = mem_rvalid_queue[mem_latency - 1];
       top->mem_wvalid_i = false;
-    } else {
+    }
+    else
+    {
       top->mem_rvalid_i = false;
       top->mem_wvalid_i = mem_rvalid_queue[mem_latency - 1];
     }
@@ -327,14 +359,15 @@ int main(int argc, char **argv) {
     top->mem_src_i = mem_meta_queue[mem_latency - 1][1];
 
     // Update Vector memory interface signals
-    for (int p = 0; p < mem_ports; p++) {
-      for (int i = 0; i < mem_w / 8; i++) {
+    for (int p = 0; p < mem_ports; p++)
+    {
+      for (int i = 0; i < mem_w / 8; i++)
+      {
         unsigned char *port = (unsigned char *)&(top->vec_mem_rdata_i[p]);
         port[i] = vec_mem_rdata_queue[p][mem_latency - 1][i];
       }
       top->vec_mem_err_i[p] = vec_mem_meta_queue[p][mem_latency - 1][0];
-      // top->vec_mem_src_i[p]   = vec_mem_meta_queue[p][mem_latency-1][1];
-      // //eliminated
+      top->vec_mem_id_i[p] = vec_mem_meta_queue[p][mem_latency - 1][1]; // OBI ID, currently limited to 2 outstanding since stored as a bool
       top->vec_mem_rvalid_i[p] =
           vec_mem_rvalid_queue[p][mem_latency - 1]; // Vector signalling over
                                                     // rvalid signal always
@@ -344,14 +377,17 @@ int main(int argc, char **argv) {
     // Next, advance fifo buffers by one cycle
     /////////
 
-    for (int i = mem_latency - 1; i > 0; i--) {
-      for (int j = 0; j < mem_w / 8; j++) {
+    for (int i = mem_latency - 1; i > 0; i--)
+    {
+      for (int j = 0; j < mem_w / 8; j++)
+      {
         mem_rdata_queue[i][j] = mem_rdata_queue[i - 1][j];
         vec_mem_rdata_queue[i][j] = vec_mem_rdata_queue[i - 1][j];
       }
       mem_rvalid_queue[i] = mem_rvalid_queue[i - 1];
       vec_mem_rvalid_queue[i] = vec_mem_rvalid_queue[i - 1];
-      for (int j = 0; j < 3; j++) {
+      for (int j = 0; j < 3; j++)
+      {
         mem_meta_queue[i][j] = mem_meta_queue[i - 1][j];
         vec_mem_meta_queue[i][j] = vec_mem_meta_queue[i - 1][j];
       }
@@ -361,7 +397,8 @@ int main(int argc, char **argv) {
     mem_meta_queue[0][0] = false;
     mem_meta_queue[0][1] = false;
     mem_meta_queue[0][2] = false;
-    for (int p = 0; p < mem_ports; p++) {
+    for (int p = 0; p < mem_ports; p++)
+    {
       vec_mem_rvalid_queue[p][0] = false;
       vec_mem_meta_queue[p][0][0] = false;
       vec_mem_meta_queue[p][0][1] = false;
@@ -373,7 +410,8 @@ int main(int argc, char **argv) {
     top->mem_gnt_i = !dmem_busy & top->mem_req_o;
     top->mem_ignt_i = !imem_busy & top->mem_ireq_o;
 
-    for (int p = 0; p < mem_ports; p++) {
+    for (int p = 0; p < mem_ports; p++)
+    {
       bool *port = (bool *)&(top->vec_mem_gnt_i);
       port[p] = !vmem_busy[p] & top->vec_mem_req_o[p];
     }
@@ -391,11 +429,12 @@ int main(int argc, char **argv) {
                     (bool *)&(top->mem_rvalid_i), (bool *)&(top->mem_err_i),
                     (bool *)&(top->mem_src_i), mem_rdata_queue,
                     mem_rvalid_queue, mem_meta_queue, mem);
-    for (int p = 0; p < mem_ports; p++) {
+    for (int p = 0; p < mem_ports; p++)
+    {
       update_mem_write(top, (top->vec_mem_addr_o[p]),
                        (top->vec_mem_req_o[p] && top->vec_mem_we_o[p] &&
                         top->vec_mem_gnt_i[p]),
-                       (top->vec_mem_src_o), mem_w, mem_latency, mem_sz,
+                       (top->vec_mem_id_o[p]), mem_w, mem_latency, mem_sz,
                        (unsigned char *)&(top->vec_mem_wdata_o[p]),
                        (unsigned char *)&(top->vec_mem_be_o[p]),
                        (bool *)&(top->vec_mem_wvalid_i[p]),
@@ -404,10 +443,10 @@ int main(int argc, char **argv) {
           top, (top->vec_mem_addr_o[p]),
           (top->vec_mem_req_o[p] && !top->vec_mem_we_o[p] &&
            top->vec_mem_gnt_i[p]),
-          top->vec_mem_we_o[p], (top->vec_mem_src_o), mem_w, mem_latency,
+          top->vec_mem_we_o[p], (top->vec_mem_id_o[p]), mem_w, mem_latency,
           mem_sz, (unsigned char *)&(top->vec_mem_rdata_i[p]),
           (bool *)&(top->vec_mem_rvalid_i[p]), (bool *)&(top->vec_mem_err_i[p]),
-          (bool *)&(top->vec_mem_src_i), vec_mem_rdata_queue[p],
+          (bool *)&(top->vec_mem_id_o[p]), vec_mem_rdata_queue[p],
           vec_mem_rvalid_queue[p], vec_mem_meta_queue[p], mem);
     }
 
@@ -415,7 +454,8 @@ int main(int argc, char **argv) {
     // repurposed to store obi.id field, used internally for the index in the
     // fetchbuffer.
 
-    for (int i = 0; i < 32 / 8; i++) {
+    for (int i = 0; i < 32 / 8; i++)
+    {
       unsigned char *port = (unsigned char *)&(top->mem_irdata_i);
       port[i] = mem_idata_queue[mem_latency - 1][i];
     }
@@ -424,12 +464,15 @@ int main(int argc, char **argv) {
     top->mem_iid_i = mem_imeta_queue[mem_latency - 1][1];
 
     // Next, advance fifo buffers by one cycle
-    for (int i = mem_latency - 1; i > 0; i--) {
-      for (int j = 0; j < 32 / 8; j++) {
+    for (int i = mem_latency - 1; i > 0; i--)
+    {
+      for (int j = 0; j < 32 / 8; j++)
+      {
         mem_idata_queue[i][j] = mem_idata_queue[i - 1][j];
       }
       mem_ivalid_queue[i] = mem_ivalid_queue[i - 1];
-      for (int j = 0; j < 3; j++) {
+      for (int j = 0; j < 3; j++)
+      {
         mem_imeta_queue[i][j] = mem_imeta_queue[i - 1][j];
       }
     }
@@ -447,37 +490,47 @@ int main(int argc, char **argv) {
     top->eval();
 
     // Currently only two outstanding DMEM requests allowed
-    if (top->mem_req_o && top->mem_gnt_i) {
+    if (top->mem_req_o && top->mem_gnt_i)
+    {
       num_outstanding_dmem++;
-      if (num_outstanding_dmem == 2) {
+      if (num_outstanding_dmem == 2)
+      {
         dmem_busy = true;
       }
     }
-    if (top->mem_rvalid_i || top->mem_wvalid_i) {
+    if (top->mem_rvalid_i || top->mem_wvalid_i)
+    {
       dmem_busy = false;
       num_outstanding_dmem--;
     }
     // Currently only two outstanding VMEM requests allowed per port
-    for (int p = 0; p < mem_ports; p++) {
-      if (top->vec_mem_req_o[p] && top->vec_mem_gnt_i[p]) {
+    for (int p = 0; p < mem_ports; p++)
+    {
+      if (top->vec_mem_req_o[p] && top->vec_mem_gnt_i[p])
+      {
         num_outstanding_vmem++;
-        if (num_outstanding_vmem == 2) {
+        if (num_outstanding_vmem == 2)
+        {
           vmem_busy[p] = true;
         }
       }
-      if (top->vec_mem_rvalid_i[p]) {
+      if (top->vec_mem_rvalid_i[p])
+      {
         vmem_busy[p] = false;
         num_outstanding_vmem--;
       }
     }
     // Currently only 2 outstanding IMEM requests allowed
-    if (top->mem_ireq_o && top->mem_ignt_i) {
+    if (top->mem_ireq_o && top->mem_ignt_i)
+    {
       num_outstanding_imem++;
-      if (num_outstanding_imem == 2) {
+      if (num_outstanding_imem == 2)
+      {
         imem_busy = true; // only two outstanding request allowed
       }
     }
-    if (top->mem_irvalid_i) {
+    if (top->mem_irvalid_i)
+    {
       num_outstanding_imem--;
       imem_busy = false;
     }
@@ -488,13 +541,16 @@ int main(int argc, char **argv) {
     char w_port;
     if (check_memmapio(top->mem_addr_o, (top->mem_req_o && top->mem_we_o), 8,
                        (unsigned char *)&(top->mem_wdata_o), 0x00000408u,
-                       &w_port)) {
-      if (w_port == 0) {
+                       &w_port))
+    {
+      if (w_port == 0)
+      {
         fprintf(stderr, "SUCCESS: TEST PASS\n");
         exit_code = 0; // For benchmarks, only 1 test
         break;
-
-      } else {
+      }
+      else
+      {
         fprintf(stderr, "ERROR: TEST FAILURE - FAILED OUTPUT VALIDATION\n");
         exit_code = 1;
         break; // For benchmarks, only 1 test
@@ -503,7 +559,8 @@ int main(int argc, char **argv) {
     // Use memory mapped UART at address 0x400 to print outputs
     if (check_memmapio(top->mem_addr_o, (top->mem_req_o && top->mem_we_o), 8,
                        (unsigned char *)&(top->mem_wdata_o), 0x00000400u,
-                       &w_port)) {
+                       &w_port))
+    {
       putc(w_port, stderr);
     }
 
@@ -516,7 +573,8 @@ int main(int argc, char **argv) {
     // Check/Write Register Commits
     //////////////////////////
 
-    if (fxreglog != NULL && top->vproc_top->i_cva6_pipeline->we_gpr_commit_id) {
+    if (fxreglog != NULL && top->vproc_top->i_cva6_pipeline->we_gpr_commit_id)
+    {
       fprintf(fxreglog, "x%d 0x%08x\n",
               top->vproc_top->i_cva6_pipeline->waddr_commit_id,
               top->vproc_top->i_cva6_pipeline->wdata_commit_id);
@@ -528,24 +586,28 @@ int main(int argc, char **argv) {
 
     // A jump to address 0x70 is a failed test caused by an interrupt being
     // called (all other interrupts also funnel here)
-    if (check_PC(top, 0x000000070u)) {
+    if (check_PC(top, 0x000000070u))
+    {
       fprintf(stderr, "ERROR: TEST FAILURE - Interrupt Called\n");
       exit_code = 1;
       break;
     }
 
     // 1000 cycles at the same address is a stall
-    if (check_stall(top, 1000)) {
+    if (check_stall(top, 1000))
+    {
       exit_code = 1;
       break;
     }
   }
 
-  if (tfp != NULL) {
+  if (tfp != NULL)
+  {
     tfp->close();
   }
 
-  if (fxreglog != NULL) {
+  if (fxreglog != NULL)
+  {
     fclose(fxreglog);
   }
   top->final();
@@ -556,14 +618,17 @@ int main(int argc, char **argv) {
   free(mem);
   free(mem_rvalid_queue);
   free(vec_mem_rvalid_queue);
-  for (int queue_pos = 0; queue_pos < mem_latency; queue_pos++) {
+  for (int queue_pos = 0; queue_pos < mem_latency; queue_pos++)
+  {
     free(mem_rdata_queue[queue_pos]);
     free(mem_idata_queue[queue_pos]);
     free(mem_meta_queue[queue_pos]);
     free(mem_imeta_queue[queue_pos]);
   }
-  for (int p = 0; p < mem_ports; p++) {
-    for (int queue_pos = 0; queue_pos < mem_latency; queue_pos++) {
+  for (int p = 0; p < mem_ports; p++)
+  {
+    for (int queue_pos = 0; queue_pos < mem_latency; queue_pos++)
+    {
       free(vec_mem_rdata_queue[p][queue_pos]);
       free(vec_mem_meta_queue[p][queue_pos]);
     }

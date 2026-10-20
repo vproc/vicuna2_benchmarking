@@ -412,7 +412,7 @@ assign no_outstanding_vlsu = 1'b1;
     assign vcore_obi_bus[i].rvalid = vec_mem_rvalid_i[i];
     assign vcore_obi_bus[i].rdata = vec_mem_rdata_i[i];
     assign vcore_obi_bus[i].err = vec_mem_err_i[i];
-    assign vcore_obi_bus[i].rid = vec_mem_id_o[i];
+    assign vcore_obi_bus[i].rid = vec_mem_id_i[i];
   end
 
 `endif
