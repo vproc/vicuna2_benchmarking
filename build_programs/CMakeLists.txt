@@ -63,7 +63,7 @@ set(MEM_LATENCY 1 CACHE STRING "Memory latency") #This should come from the vect
 set(TOOLCHAIN_TOP ${CMAKE_CURRENT_SOURCE_DIR}/../toolchain) #Top level path to toolchain folder
 set(VERILATOR_MODEL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../processor_models/verilator) #Top level path to verilator model files
 set(GEM5_MODEL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../processor_models/gem5)#Top level path to gem5 model files
-set(BUILD_DIR   ${CMAKE_CURRENT_SOURCE_DIR}/build/${RISCV_ARCH}_zvl${VREG_W}b) #Top level path to program build folder
+set(BUILD_DIR   ${CMAKE_CURRENT_SOURCE_DIR}/build/) #Top level path to program build folder
 
 #These control benchmark configurations specific to the selected RISCV_ARCH
 option(RISCV_F "Use the RISC-V F Extension" OFF)
