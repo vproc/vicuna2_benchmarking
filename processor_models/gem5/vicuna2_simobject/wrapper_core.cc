@@ -213,7 +213,6 @@ gem5::PacketPtr Wrapper_Core::get_dport_packet(){
         //packet->dataStatic(dataPtr); 
         return packet;
     }
-    //return packet;
 }
 
 void Wrapper_Core::set_dport_gnt(bool val){
@@ -267,7 +266,7 @@ gem5::PacketPtr Wrapper_Core::get_vport_packet(){
 
     if (top->vec_mem_we_o[0]){
         gem5::RequestPtr req = std::make_shared<gem5::Request>(addr, vmem_w/8, gem5::Request::STRICT_ORDER, 0);
-        req->taskId((bool)top->vec_mem_id_o[0]); //currently not needed, will be necessary for multiple outstanding requests
+        req->taskId((bool)top->vec_mem_id_o[0]); //Currently only two valid Ids, so 2 oustanding requests
         gem5::PacketPtr packet = nullptr;
         packet = gem5::Packet::createWrite(req);
         uint32_t* dataPtr = (uint32_t*)malloc(vmem_w/8);
@@ -283,6 +282,7 @@ gem5::PacketPtr Wrapper_Core::get_vport_packet(){
     } else {
         gem5::RequestPtr req = std::make_shared<gem5::Request>(addr, vmem_w/8, gem5::Request::INST_FETCH, 0); //for some reason, trying to set reads the other way fails to read data correctly.
         gem5::PacketPtr packet = nullptr;
+        req->taskId((bool)top->vec_mem_id_o[0]);
         packet = gem5::Packet::createRead(req); //always a read request
         packet->allocate();
         return packet;
@@ -294,6 +294,7 @@ void Wrapper_Core::set_vport_gnt(bool val){
 void Wrapper_Core::set_vmem_resp(gem5::PacketPtr pkt){
     uint32_t *data_ptr = pkt->getPtr<uint32_t>();
     memcpy(&(top->vec_mem_rdata_i[0]), data_ptr, vmem_w/8);
+    top->vec_mem_id_i[0] = pkt->req->taskId();
     if (pkt->isWrite()){
         //Vector Write Response
         top->vec_mem_src_i = true;

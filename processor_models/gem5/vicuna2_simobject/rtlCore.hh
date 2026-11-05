@@ -123,10 +123,24 @@ class rtlCore : public rtlObject
         VMemReqPort(const std::string& name, rtlCore *owner) :
             RequestPort(name, owner), owner(owner)
         { }
-        bool busy;
-        bool prev_succ;
-        bool resp_busy;
-        bool send_respretry;
+      bool busy;
+      bool resp_busy;
+      bool send_respretry;
+      int num_outstanding;
+      int num_valid_outstanding;
+      int num_flush;
+      PacketPtr outstanding[2];
+      bool valid_out[2];
+
+      bool next_id;
+      bool resend_ooo_packet;
+      bool ooo_packet_valid;
+      PacketPtr ooo_packet;
+      uint32_t ooo_val;
+      bool ooo_id;
+      bool now_flush;
+
+      bool last_id_sent;
 
       protected:
         bool recvTimingResp(PacketPtr pkt) override;

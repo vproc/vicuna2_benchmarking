@@ -102,7 +102,6 @@ rtlCore::IMemReqPort::recvTimingResp(PacketPtr pkt)
             return false;
         }
     } else {
-        
         if (owner->printireqs)
         {
             printf("-----Killed Packet-------\n");
@@ -115,7 +114,6 @@ rtlCore::IMemReqPort::recvTimingResp(PacketPtr pkt)
             valid_out[pkt->req->taskId()]=false;
         return true; //packet has been killed. Ack
     }
-    
 }
 
 void
@@ -170,46 +168,59 @@ rtlCore::DMemReqPort::recvTimingResp(PacketPtr pkt)
 void
 rtlCore::VMemReqPort::recvReqRetry()
 {
-    //warn("Retry Signal Received - DMEM");
     bool success = sendTimingReq(owner->vpkt_stalled);
     if (success){
-        //warn("Successful ReTransmission ##### DMEM");
-            // warn("                ");
-        //core->set_dport_gnt(true);
-        
-        //printf("%X\n",owner->dpkt_stalled->getAddr());
-        //printf("%X\n",owner->dpkt_stalled->req->taskId());
-        //printf("%X\n",owner->dpkt_stalled->req->time());
-        //Allow only one outstanding dreq at once
-        //busy=true;
-        busy=false;
-        prev_succ=true;
-        //warn("Successful Re-Transmission ##### DMEM");
-        //printf("%X\n",owner->dpkt_stalled->getAddr());
+       busy=false;
     } 
 }
 bool
 rtlCore::VMemReqPort::recvTimingResp(PacketPtr pkt)
 {
-    if (owner->printdreqs)
-    {
-        warn("Successful Response ##### VMEM");
-        printf("%X\n",pkt->getAddr());
-    }
     //can only handle one response per cycle
     if (!resp_busy){
-        owner->handleVmemResp(pkt);
-        resp_busy = true;
-        //
-        busy=false;
-        //
-        return true;
+        if (true){ //Vector unit handles OoO responses in VLSU
+        //if (pkt->req->taskId() == next_id)
+        //{
+            if (owner->printdreqs)
+            {
+                printf("\n************ Received Response VMEM *************\n");
+                printf("ADDR: %X\n",pkt->getAddr());
+                printf("ID:  %X\n",pkt->req->taskId());
+                printf("%X\n\n",*pkt->getPtr<uint32_t>());
+            }
+            num_outstanding-=1;
+            num_valid_outstanding-=1;
+            owner->handleVmemResp(pkt);
+
+            next_id = !next_id; 
+            resp_busy = true;
+            busy=false;
+            valid_out[pkt->req->taskId()]=false;
+            return true;
+        } else {
+            // printf("\n+++++++++++ Stalled Response for ID Mismatch +++++++++++++\n");
+            // printf("ADDR: %X\n",pkt->getAddr());
+            // printf("ID:  %X\n",pkt->req->taskId());
+            // printf("%X\n\n",*pkt->getPtr<uint32_t>());
+            // printf("WAITING ON ID:  %X\n\n",next_id);
+            resend_ooo_packet = true;
+            ooo_packet = pkt;
+            busy = true;
+            uint32_t *data_ptr = pkt->getPtr<uint32_t>();
+
+            ooo_val = *data_ptr;
+            ooo_id = pkt->req->taskId();
+            return true;
+        }
+        
     } else {
+        // printf("\n&&&&&&&&& Stalled Response for Multiple in one cycle &&&&&&&&&&\n");
+        // printf("ADDR: %X\n",pkt->getAddr());
+        // printf("ID:  %X\n",pkt->req->taskId());
+        // printf("%X\n\n",*pkt->getPtr<uint32_t>());
         resp_busy = true;
         send_respretry = true;
-        //
-        //busy=false;
-        //
+        busy=true;
         return false;
     }
 }
@@ -251,6 +262,16 @@ rtlCore::rtlCore(const rtlCoreParams &params) :
     imem_req.resend_ooo_packet = false;
     imem_req.now_flush = false;
     imem_req.last_id_sent = false;
+
+    vmem_req.num_outstanding = 0;
+    vmem_req.num_valid_outstanding=0;
+    vmem_req.num_flush = 0;
+    vmem_req.valid_out[0] = false;
+    vmem_req.valid_out[1] = false;
+    vmem_req.next_id = false;
+    vmem_req.resend_ooo_packet = false;
+    vmem_req.now_flush = false;
+    vmem_req.last_id_sent = false;
 
     initRTLModel();
 }
@@ -402,9 +423,15 @@ rtlCore::tick() {
 
     //Handle V port req
     if (!vmem_req.busy){
-        //warn("vmem open");
         if (core->get_vport_valid()){
-            //warn("attempt DREQ");
+
+            vmem_req.num_outstanding+=1; //getting here always means a request is outstanding
+            vmem_req.num_valid_outstanding+=1;
+            if (vmem_req.num_outstanding == 2) //only 2 outstanding
+            {
+                vmem_req.busy=true;
+            }
+
             PacketPtr curReq = core->get_vport_packet();
 
             bool success = vmem_req.sendTimingReq(curReq);
@@ -418,13 +445,8 @@ rtlCore::tick() {
                     warn("                ");
                 }
 
-                //Allow only one outstanding vreq at once
-                //
-                vmem_req.busy=true;
-                vmem_req.prev_succ=true;//Deprecated signal?
-                
             } else {
-                //warn("Failed DMEM Request, Retry #####");
+                //warn("Failed VMEM Request, Retry #####");
                 //printf("%X\n",curReq->getAddr());
                 //printf("%X\n",curReq->req->taskId());
                 //printf("Timestamp: %d\n",curReq->req->time());
@@ -533,7 +555,7 @@ rtlCore::tick() {
         dmem_req.sendRetryResp();
     }
 
-    vmem_req.resp_busy = false;
+    vmem_req.resp_busy = false;  //Vector unit should already be handling OoO responses 
     if (vmem_req.send_respretry)
     {
         //printf("Sending Retry Signal\n");
