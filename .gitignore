@@ -6,6 +6,7 @@ build_programs/build/*
 #Ignore built GCCs
 toolchain/GCC/multilib/*
 toolchain/GCC/rv32im_zve32x/*
+toolchain/GCC/rv32im/*
 toolchain/llvm/llvm_22_1_8/*
 toolchain/spike/*
 
