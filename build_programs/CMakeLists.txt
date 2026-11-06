@@ -177,7 +177,7 @@ if(${COMPILER} STREQUAL "GCC")
 
     option(AUTOVEC "Disable/Enable Autovectorization for GCC" ON)
     if (${AUTOVEC})
-        set(AUTOVEC_FLAGS "-ftree-vectorize -fno-tree-slp-vectorize")
+        set(AUTOVEC_FLAGS "-ftree-vectorize -ftree-slp-vectorize")
     else()
         set(AUTOVEC_FLAGS "-fno-tree-vectorize -fno-tree-slp-vectorize")
     endif()
