@@ -43,8 +43,8 @@ macro(add_Benchmark_Verilator TEST)
 
     add_custom_command(TARGET ${TEST_NAME}
         POST_BUILD
-        COMMAND ${CMAKE_OBJCOPY} -O binary ${TEST_NAME}.elf ${TEST_NAME}.bin
-        COMMAND srec_cat ${TEST_NAME}.bin -binary -offset 0x0000 -byte-swap 4 -o ${TEST_NAME}.vmem -vmem
+        COMMAND ${CMAKE_OBJCOPY} --pad-to=0x80400000 -O binary ${TEST_NAME}.elf ${TEST_NAME}.bin
+        COMMAND srec_cat ${TEST_NAME}.bin -binary -offset 0x00000000 -byte-swap 4 -o ${TEST_NAME}.vmem -vmem
         COMMAND rm -f prog_${TEST_NAME}.txt
         COMMAND echo -n "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.vmem ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_unused.txt " > prog_${TEST_NAME}.txt
         COMMAND readelf -s ${TEST_NAME}.elf | sed '2,13 s/ //1' | grep vref_start | cut -d " " -f 6 | tr [=["\n"]=] " " >> prog_${TEST_NAME}.txt

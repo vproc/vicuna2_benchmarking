@@ -68,6 +68,7 @@ macro(build_gcc_header_only ARCH)
 endmacro()
 
 macro(build_llvm)
+    build_gcc_header_only(rv32im) #need scalar headers for scalar builds to not include vectorized stdlib
     build_gcc_header_only(rv32im_zve32x)
     if(NOT EXISTS "${TOOLCHAIN_TOP}/llvm/llvm_22_1_8")
 
