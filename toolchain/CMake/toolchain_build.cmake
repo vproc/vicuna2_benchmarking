@@ -70,7 +70,7 @@ endmacro()
 macro(build_llvm)
     build_gcc_header_only(rv32im) #need scalar headers for scalar builds to not include vectorized stdlib
     build_gcc_header_only(rv32im_zve32x)
-    if(NOT EXISTS "${TOOLCHAIN_TOP}/llvm/llvm_22_1_8")
+    if(NOT EXISTS "${TOOLCHAIN_TOP}/llvm/llvm_23_1_5")
 
         if(DIST STREQUAL "Ubuntu") #TODO: Find these dependencies
             message(STATUS "Downloading Ubuntu Dependencies")
@@ -89,7 +89,7 @@ macro(build_llvm)
                             WORKING_DIRECTORY ${TOOLCHAIN_TOP})
         endif()
 
-        message(FATAL_ERROR "#####################################################################################################################\n ERROR : LLVM NOT BUILT \n Run the following two commands in the ${TOOLCHAIN_TOP}/llvm-project/ folder \n\n cmake -S llvm -B build -G Ninja -DCMAKE_INSTALL_PREFIX=${TOOLCHAIN_TOP}/llvm/llvm_22_1_8 -DCMAKE_C_COMPILER=clang  -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD=\"RISCV\" -DLLVM_ENABLE_PROJECTS=\"clang;lld\"  -DLLVM_DEFAULT_TARGET_TRIPLE=\"riscv32-unknown-linux-gnu\" -DLLVM_INSTALL_TOOLCHAIN_ONLY=On \n\n ninja -C build install \n\n#####################################################################################################################\n")
+        message(FATAL_ERROR "#####################################################################################################################\n ERROR : LLVM NOT BUILT \n Run the following two commands in the ${TOOLCHAIN_TOP}/llvm-project/ folder \n\n cmake -S llvm -B build -G Ninja -DCMAKE_INSTALL_PREFIX=${TOOLCHAIN_TOP}/llvm/llvm_23_1_5 -DCMAKE_C_COMPILER=clang  -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD=\"RISCV\" -DLLVM_ENABLE_PROJECTS=\"clang;lld\"  -DLLVM_DEFAULT_TARGET_TRIPLE=\"riscv32-unknown-linux-gnu\" -DLLVM_INSTALL_TOOLCHAIN_ONLY=On \n\n ninja -C build install \n\n#####################################################################################################################\n")
         # CANNOT CALL cmake project from within cmake project  TODO: resolve this
         # execute_process(COMMAND  cmake -S llvm -B build -G Ninja -DCMAKE_INSTALL_PREFIX=${TOOLCHAIN_TOP}/llvm/llvm_22_1_8 -DCMAKE_C_COMPILER=clang  -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD="RISCV" -DLLVM_ENABLE_PROJECTS="clang;lld"  -DLLVM_DEFAULT_TARGET_TRIPLE="riscv32-unknown-linux-gnu" -DLLVM_INSTALL_TOOLCHAIN_ONLY=On
         #                 WORKING_DIRECTORY ${TOOLCHAIN_TOP}/llvm-project/)
