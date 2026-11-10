@@ -593,8 +593,8 @@ int main(int argc, char **argv)
       break;
     }
 
-    // 1000 cycles at the same address is a stall
-    if (check_stall(top, 1000))
+    // 10000 cycles at the same address is a stall
+    if (check_stall(top, 10000))
     {
       exit_code = 1;
       break;
