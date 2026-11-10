@@ -4,7 +4,7 @@ set(RISCV_GCC_BASENAME "riscv32-unknown-elf")
 
 set(RISCV_LLVM_PREFIX "${TOOLCHAIN_TOP}/llvm/llvm_23_1_5/bin" CACHE PATH "Install location of LLVM RISC-V toolchain.")
 
-set(AUTOVECTORIZATION_FLAGS "-mno-vector-strict-align")
+set(AUTOVECTORIZATION_FLAGS "-mllvm --riscv-v-register-bit-width-lmul=${LLVM_LMUL} -mno-vector-strict-align -mllvm --force-tail-folding-style=data-with-evl -mllvm --scalable-vectorization=always ") # vicuna handles strict alignment condition in hardware, so don't need extra code for it here.  This might cause issues for other simulators though
 
 set(CMAKE_C_COMPILER ${RISCV_LLVM_PREFIX}/clang)
 set(CMAKE_CXX_COMPILER ${RISCV_LLVM_PREFIX}/clang++)

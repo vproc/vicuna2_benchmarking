@@ -176,8 +176,9 @@ if(${COMPILER} STREQUAL "GCC")
     # Select Toolchain File
 
     option(AUTOVEC "Disable/Enable Autovectorization for GCC" ON)
+    
     if (${AUTOVEC})
-        set(AUTOVEC_FLAGS "-ftree-vectorize -ftree-slp-vectorize")
+        set(AUTOVEC_FLAGS "-ftree-vectorize -ftree-slp-vectorize") #TODO: might need to append directly to C flags
     else()
         set(AUTOVEC_FLAGS "-fno-tree-vectorize -fno-tree-slp-vectorize")
     endif()
@@ -186,12 +187,18 @@ if(${COMPILER} STREQUAL "GCC")
 
 elseif(${COMPILER} STREQUAL "LLVM")
     build_llvm()
+
+    option(LLVM_LMUL "Autovectorization parameter for LLVM"  1)
+
     set(CMAKE_TOOLCHAIN_FILE "${TOOLCHAIN_TOP}/llvm/llvm_toolchain.cmake")
 else()
     message(FATAL_ERROR "UNSUPPORTED COMPILER SELECTED.  Select a valid compiler with -DCOMPILER=GCC/LLVM.")
 endif()
+
 project(Vicuna2_Benchmarking_Environment LANGUAGES C CXX ASM DESCRIPTION "Vicuna2 Benchmarking Environment")
 include(CTest)
+
+
 
 ########
 #Add Program Subdirectories
